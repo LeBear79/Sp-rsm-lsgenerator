@@ -58,10 +58,10 @@
     .optionedit{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin:8px 0}
     .optionedit input[type="radio"]{width:auto}
     .editor-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-    .ai-panel{margin-top:14px;padding:14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px}
-    .statusline{margin-top:10px;font-size:.92rem}
-    .spinner{display:inline-block;width:16px;height:16px;border:2px solid #bfdbfe;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;margin-right:6px}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    .chat-import{margin-top:16px;padding:16px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:14px}
+    .chat-import textarea{min-height:220px}
+    .format-example{white-space:pre-wrap;background:#fff;border:1px solid #dbeafe;border-radius:10px;padding:10px;font-size:.88rem;margin-top:10px}
+    .successbox{padding:10px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;margin-top:10px}
   </style>
 </head>
 <body>
@@ -84,7 +84,7 @@
     <div class="grid">
       <div class="card">
         <h2>Lag en oppgave</h2>
-        <p class="muted">Velg kilde og hvordan spørsmålene skal lages. KI-modus lager mer naturlige spørsmål og faglig plausible svaralternativer.</p>
+        <p class="muted">Velg om innholdet skal hentes fra en tekst du limer inn, eller fra en nettside. v1.3 lager kortere og mer naturlige spørsmål.</p>
 
         <label for="taskTitle">Tittel</label>
         <input id="taskTitle" placeholder="Eksempel: Økosystemer" />
@@ -114,21 +114,32 @@
           </div>
         </div>
 
-        <label for="generatorMode">Hvordan skal spørsmålene lages?</label>
-        <select id="generatorMode">
-          <option value="ai" selected>KI – anbefalt</option>
-          <option value="local">Enkel generator i nettleseren</option>
-        </select>
+        <div class="chat-import">
+          <strong>Lag spørsmål med ChatGPT</strong>
+          <p class="small" style="margin:6px 0 10px">Ingen API eller installasjon er nødvendig. Kopier instruksjonen, bruk den sammen med fagteksten i ChatGPT, og lim deretter svaret inn her.</p>
+          <button id="copyChatPromptBtn" class="secondary" type="button">Kopier instruksjon til ChatGPT</button>
 
-        <div id="aiPanel" class="ai-panel">
-          <strong>KI-generering</strong>
-          <p class="small" style="margin:6px 0 10px">KI-en får beskjed om å lage korte spørsmål og tre troverdige, men feil, alternativer som handler om samme tema som riktig svar.</p>
-          <label for="backendUrl">Firebase Function-adresse</label>
-          <input id="backendUrl" placeholder="https://...cloudfunctions.net/generateQuiz" />
-          <div class="small muted" style="margin-top:6px">API-nøkkelen skal ikke stå her. Den lagres sikkert i Firebase-funksjonen.</div>
+          <label for="chatImport" style="margin-top:12px">Lim inn spørsmål fra ChatGPT</label>
+          <textarea id="chatImport" placeholder="Lim inn spørsmålene her..."></textarea>
+          <div class="editor-actions">
+            <button id="importChatBtn" type="button">Importer spørsmål</button>
+            <button id="clearChatBtn" class="secondary" type="button">Tøm feltet</button>
+          </div>
+          <div id="chatImportStatus"></div>
+          <details style="margin-top:10px">
+            <summary>Vis formatet programmet forventer</summary>
+            <div class="format-example">SPØRSMÅL: Hva er hoggorm?
+A: En av tre slangearter i Norge
+B: Den eneste slangearten i Norge
+C: En øgle uten bein
+D: En slange som bare lever i vann
+RIKTIG: A
+
+SPØRSMÅL: Hvorfor trenger hoggormen varme?
+SVARTYPE: TEKST
+FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
+          </details>
         </div>
-
-        <div id="generationStatus" class="statusline"></div>
 
         <div class="row">
           <div>
@@ -245,14 +256,50 @@ $('navStudent').onclick=()=>showView('student');
 $('navResponses').onclick=()=>showView('responses');
 
 
-const savedBackend = localStorage.getItem('sg_backend_url') || '';
-$('backendUrl').value = savedBackend;
-$('backendUrl').addEventListener('change', ()=>{
-  localStorage.setItem('sg_backend_url', $('backendUrl').value.trim());
-});
-$('generatorMode').addEventListener('change', ()=>{
-  $('aiPanel').classList.toggle('hidden', $('generatorMode').value !== 'ai');
-});
+$('copyChatPromptBtn').onclick=async()=>{
+  const txt=chatPromptText();
+  try{
+    await navigator.clipboard.writeText(txt);
+    $('chatImportStatus').innerHTML='<div class="successbox">Instruksjonen er kopiert. Lim den inn i ChatGPT, legg fagteksten under TEKST, og kopier svaret tilbake hit.</div>';
+  }catch(e){
+    $('chatImport').value=txt;
+    $('chatImportStatus').innerHTML='<div class="warnbox">Nettleseren tillot ikke automatisk kopiering. Instruksjonen er derfor lagt i feltet slik at du kan kopiere den manuelt.</div>';
+  }
+};
+
+$('clearChatBtn').onclick=()=>{
+  $('chatImport').value='';
+  $('chatImportStatus').innerHTML='';
+};
+
+$('importChatBtn').onclick=()=>{
+  try{
+    const questions=parseChatQuestions($('chatImport').value);
+    const title=$('taskTitle').value.trim()||'Uten tittel';
+    const code=codeFromTitle(title);
+    const task={
+      code,title,
+      text:(sourceMode==='text' ? $('sourceText').value : $('webText').value).trim(),
+      type:'imported',
+      count:questions.length,
+      difficulty:$('difficulty').value,
+      questions,
+      sourceMode,
+      sourceUrl:sourceMode==='web' ? $('sourceUrl').value.trim() : '',
+      created:new Date().toISOString()
+    };
+    const tasks=store.tasks; tasks[code]=task; store.tasks=tasks;
+    $('taskEmpty').classList.add('hidden');
+    $('taskCreated').classList.remove('hidden');
+    $('taskCodeLabel').textContent=code;
+    $('taskSummary').textContent=`${title} · ${questions.length} spørsmål · importert fra ChatGPT`;
+    $('taskCreated').dataset.code=code;
+    renderPreview(task);
+    $('chatImportStatus').innerHTML=`<div class="successbox">${questions.length} spørsmål ble importert. Se gjennom og rediger dem før bruk.</div>`;
+  }catch(e){
+    $('chatImportStatus').innerHTML=`<div class="warnbox">${escapeHtml(e.message)}</div>`;
+  }
+};
 
 $('sourceTextBtn').onclick = () => {
   sourceMode='text';
@@ -408,52 +455,104 @@ function answerCandidates(sentences, currentIndex, correct){
 }
 
 
-async function makeQuestionsWithAI(text,type,count,difficulty){
-  const endpoint = $('backendUrl').value.trim();
-  if(!endpoint){
-    throw new Error('KI er valgt, men Firebase Function-adressen mangler. Se README-filen i v1.4 for oppsett.');
-  }
+function chatPromptText(){
+  const type=$('questionType').value;
+  const count=Number($('questionCount').value)||8;
+  const difficulty=$('difficulty').value;
+  const typeText = type==='mc'
+    ? 'Lag bare multiple choice-spørsmål.'
+    : type==='text'
+      ? 'Lag bare åpne tekstspørsmål.'
+      : 'Lag en god blanding av multiple choice og åpne tekstspørsmål.';
 
-  localStorage.setItem('sg_backend_url', endpoint);
+  return `Lag ${count} faglige spørsmål for norske ungdomsskoleelever ut fra teksten jeg limer inn etter denne instruksjonen.
 
-  const response = await fetch(endpoint, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      text:text.slice(0,24000),
-      questionType:type,
-      count,
-      difficulty
-    })
-  });
+Krav:
+- Skriv korte, tydelige og naturlige spørsmål.
+- Vanskelighetsgrad: ${difficulty}.
+- ${typeText}
+- Bruk bare opplysninger som kan støttes av teksten.
+- Ikke lag unødvendig lange spørsmål.
 
-  let data;
-  try { data = await response.json(); }
-  catch(e) { throw new Error('Serveren svarte ikke med gyldige data.'); }
+For multiple choice:
+- Lag nøyaktig fire svaralternativer.
+- Ett alternativ skal være riktig.
+- De tre feilalternativene skal være plausible og faglig relevante.
+- Alle fire alternativene skal handle om det samme som spørsmålet.
+- Unngå tilfeldige fakta, tullesvar, "Ingen av delene", "Alle alternativene" og lignende.
+- Feilalternativene skal være gode nok til at eleven må kunne fagstoffet.
 
-  if(!response.ok){
-    throw new Error(data?.error || `KI-tjenesten svarte med feil (${response.status}).`);
-  }
-  if(!Array.isArray(data.questions) || !data.questions.length){
-    throw new Error('KI-tjenesten returnerte ingen spørsmål.');
-  }
+For åpne spørsmål:
+- Lag et kort forslag til fasit/lærergrunnlag.
 
-  return data.questions.map(q=>{
-    if(q.type==='mc'){
-      return {
-        type:'mc',
-        prompt:String(q.prompt||'').trim(),
-        options:(Array.isArray(q.options)?q.options:[]).filter(Boolean).slice(0,4),
-        answer:String(q.answer||'').trim(),
-        modelAnswer:String(q.modelAnswer||'').trim()
-      };
+SVAR NØYAKTIG I DETTE FORMATET:
+
+SPØRSMÅL: [spørsmålet]
+A: [alternativ]
+B: [alternativ]
+C: [alternativ]
+D: [alternativ]
+RIKTIG: [A, B, C eller D]
+
+For åpne spørsmål:
+SPØRSMÅL: [spørsmålet]
+SVARTYPE: TEKST
+FASIT: [kort fasit]
+
+Ikke bruk nummerering, tabeller eller ekstra forklaringer utenfor dette formatet.
+
+TEKST:
+[Lim inn fagteksten her]`;
+}
+
+function parseChatQuestions(raw){
+  const normalized=raw.replace(/\r/g,'').trim();
+  if(!normalized) throw new Error('Lim inn spørsmålene fra ChatGPT først.');
+
+  const blocks=normalized.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
+  const questions=[];
+
+  for(const block of blocks){
+    const lines=block.split('\n').map(s=>s.trim()).filter(Boolean);
+    const qLine=lines.find(l=>/^SPØRSMÅL\s*:/i.test(l));
+    if(!qLine) continue;
+    const prompt=qLine.replace(/^SPØRSMÅL\s*:\s*/i,'').trim();
+    if(!prompt) continue;
+
+    const isText=lines.some(l=>/^SVARTYPE\s*:\s*TEKST/i.test(l));
+    if(isText){
+      const f=lines.find(l=>/^FASIT\s*:/i.test(l));
+      questions.push({
+        type:'text',
+        prompt,
+        modelAnswer:f ? f.replace(/^FASIT\s*:\s*/i,'').trim() : ''
+      });
+      continue;
     }
-    return {
-      type:'text',
-      prompt:String(q.prompt||'').trim(),
-      modelAnswer:String(q.modelAnswer||'').trim()
-    };
-  });
+
+    const optionMap={};
+    for(const key of ['A','B','C','D']){
+      const line=lines.find(l=>new RegExp('^'+key+'\\s*:','i').test(l));
+      if(line) optionMap[key]=line.replace(new RegExp('^'+key+'\\s*:\\s*','i'),'').trim();
+    }
+    const rightLine=lines.find(l=>/^RIKTIG\s*:/i.test(l));
+    const rightKey=rightLine ? rightLine.replace(/^RIKTIG\s*:\s*/i,'').trim().toUpperCase().charAt(0) : '';
+
+    if(Object.keys(optionMap).length===4 && optionMap[rightKey]){
+      questions.push({
+        type:'mc',
+        prompt,
+        options:['A','B','C','D'].map(k=>optionMap[k]),
+        answer:optionMap[rightKey],
+        modelAnswer:''
+      });
+    }
+  }
+
+  if(!questions.length){
+    throw new Error('Jeg fant ingen spørsmål i riktig format. Bruk «Kopier instruksjon til ChatGPT» og lim inn svaret på nytt.');
+  }
+  return questions;
 }
 
 function makeQuestions(text,type,count){
@@ -530,32 +629,18 @@ function renderPreview(task){
     </div>`).join('');
   $('editorButtons').classList.remove('hidden');
 }
-$('generateBtn').onclick=async()=>{
-  const btn=$('generateBtn');
+$('generateBtn').onclick=()=>{
   try{
     const title=$('taskTitle').value.trim()||'Uten tittel';
     const text=(sourceMode==='text' ? $('sourceText').value : $('webText').value).trim();
     if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');
-
     const type=$('questionType').value;
     const count=Number($('questionCount').value);
     const difficulty=$('difficulty').value;
-    const mode=$('generatorMode').value;
-
-    btn.disabled=true;
-    btn.textContent=mode==='ai' ? 'KI lager spørsmål...' : 'Lager spørsmål...';
-    $('generationStatus').innerHTML=mode==='ai'
-      ? '<span class="spinner"></span>Analyserer teksten og lager faglig relevante svaralternativer...'
-      : 'Lager spørsmål lokalt...';
-
-    const questions = mode==='ai'
-      ? await makeQuestionsWithAI(text,type,count,difficulty)
-      : makeQuestions(text,type,count);
-
+    const questions=makeQuestions(text,type,count);
     const code=codeFromTitle(title);
     const task={
-      code,title,text,type,count:questions.length,difficulty,questions,
-      generatorMode:mode,
+      code,title,text,type,count,difficulty,questions,
       sourceMode,
       sourceUrl:sourceMode==='web' ? $('sourceUrl').value.trim() : '',
       created:new Date().toISOString()
@@ -564,16 +649,10 @@ $('generateBtn').onclick=async()=>{
     $('taskEmpty').classList.add('hidden');
     $('taskCreated').classList.remove('hidden');
     $('taskCodeLabel').textContent=code;
-    $('taskSummary').textContent=`${title} · ${questions.length} spørsmål · ${difficulty} · ${mode==='ai'?'KI':'Lokal'}`;
+    $('taskSummary').textContent=`${title} · ${count} spørsmål · ${difficulty}`;
     $('taskCreated').dataset.code=code;
     renderPreview(task);
-    $('generationStatus').innerHTML='<span class="pill ok">Spørsmålene er klare. Se gjennom og rediger før bruk.</span>';
-  }catch(e){
-    $('generationStatus').innerHTML=`<div class="warnbox">${escapeHtml(e.message)}</div>`;
-  }finally{
-    btn.disabled=false;
-    btn.textContent='Lag spørsmål';
-  }
+  }catch(e){alert(e.message)}
 };
 
 $('saveEditsBtn').onclick=()=>{
