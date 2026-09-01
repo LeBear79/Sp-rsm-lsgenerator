@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spørsmålsgenerator v1.0</title>
+  <meta name="theme-color" content="#0f172a" />
+  <style>
+    :root{
+      --bg:#f8fafc; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
+      --line:#e2e8f0; --accent:#2563eb; --accent2:#1d4ed8;
+      --ok:#15803d; --bad:#b91c1c; --warn:#a16207;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    header{background:#0f172a;color:white;padding:18px 20px;position:sticky;top:0;z-index:5}
+    .wrap{max-width:1100px;margin:0 auto}
+    header .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px}
+    h1{font-size:1.3rem;margin:0}
+    .version{font-size:.85rem;color:#cbd5e1}
+    nav{display:flex;gap:8px;flex-wrap:wrap}
+    nav button,.tabbtn{border:0;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
+    nav button{background:#1e293b;color:#fff}
+    nav button.active{background:#fff;color:#0f172a}
+    main{padding:24px 16px 40px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    @media(max-width:850px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 4px 18px rgba(15,23,42,.04)}
+    .card h2,.card h3{margin-top:0}
+    label{display:block;font-weight:700;margin:12px 0 6px}
+    input,textarea,select{width:100%;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
+    textarea{min-height:180px;resize:vertical}
+    button.primary{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer}
+    button.primary:hover{background:var(--accent2)}
+    button.secondary{background:#e2e8f0;color:#0f172a;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    button.danger{background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+    .row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+    .row > *{flex:1}
+    .muted{color:var(--muted)}
+    .hidden{display:none!important}
+    .pill{display:inline-block;padding:4px 9px;border-radius:999px;background:#e2e8f0;font-size:.82rem;font-weight:700}
+    .pill.ok{background:#dcfce7;color:#166534}
+    .pill.warn{background:#fef3c7;color:#92400e}
+    .q{border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+    .q h4{margin:0 0 10px}
+    .option{display:block;border:1px solid #cbd5e1;border-radius:10px;padding:10px;margin:8px 0;cursor:pointer}
+    .option input{width:auto;margin-right:8px}
+    .score{font-size:1.2rem;font-weight:800}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    .small{font-size:.88rem}
+    .notice{padding:12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
+    .warnbox{padding:12px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+    code{background:#e2e8f0;padding:2px 5px;border-radius:5px}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div>
+      <h1>Spørsmålsgenerator</h1>
+      <div class="version">v1.0</div>
+    </div>
+    <nav>
+      <button id="navTeacher" class="active">Lærer</button>
+      <button id="navStudent">Elev</button>
+      <button id="navResponses">Svaroversikt</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="teacherView">
+    <div class="grid">
+      <div class="card">
+        <h2>Lag en oppgave</h2>
+        <p class="muted">Lim inn en fagtekst. v1.0 lager spørsmål lokalt i nettleseren. Senere kan KI kobles på uten å legge API-nøkkel i nettsiden.</p>
+
+        <label for="taskTitle">Tittel</label>
+        <input id="taskTitle" placeholder="Eksempel: Økosystemer" />
+
+        <label for="sourceText">Fagtekst</label>
+        <textarea id="sourceText" placeholder="Lim inn teksten her..."></textarea>
+
+        <div class="row">
+          <div>
+            <label for="questionType">Oppgavetype</label>
+            <select id="questionType">
+              <option value="mc">Multiple choice</option>
+              <option value="text">Tekstsvar</option>
+              <option value="both" selected>Begge deler</option>
+            </select>
+          </div>
+          <div>
+            <label for="questionCount">Antall spørsmål</label>
+            <select id="questionCount">
+              <option>5</option><option selected>8</option><option>10</option><option>12</option>
+            </select>
+          </div>
+          <div>
+            <label for="difficulty">Vanskelighetsgrad</label>
+            <select id="difficulty">
+              <option>Lett</option>
+              <option selected>Middels</option>
+              <option>Vanskelig</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <button class="primary" id="generateBtn">Lag spørsmål</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Oppgavekode</h2>
+        <div id="taskEmpty" class="muted">Ingen oppgave er laget ennå.</div>
+        <div id="taskCreated" class="hidden">
+          <p><span class="pill ok">Klar</span></p>
+          <p class="score" id="taskCodeLabel"></p>
+          <p id="taskSummary"></p>
+          <button class="secondary" id="copyCodeBtn">Kopier kode</button>
+          <button class="danger" id="deleteTaskBtn">Slett oppgave</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h3>Forhåndsvisning</h3>
+      <div id="preview" class="muted">Spørsmålene vises her.</div>
+    </div>
+  </section>
+
+  <section id="studentView" class="hidden">
+    <div class="card">
+      <h2>Åpne oppgave</h2>
+      <div class="row">
+        <div>
+          <label for="studentName">Navn</label>
+          <input id="studentName" placeholder="Skriv navnet ditt" />
+        </div>
+        <div>
+          <label for="studentCode">Oppgavekode</label>
+          <input id="studentCode" placeholder="Eksempel: EKO-4271" />
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="primary" id="openTaskBtn">Åpne</button>
+        </div>
+      </div>
+      <div id="studentMessage" style="margin-top:12px"></div>
+    </div>
+
+    <div id="studentTaskCard" class="card hidden" style="margin-top:18px">
+      <h2 id="studentTaskTitle"></h2>
+      <p class="muted" id="studentTaskMeta"></p>
+      <form id="studentForm"></form>
+      <button class="primary" id="submitBtn">Lever svar</button>
+    </div>
+
+    <div id="studentResult" class="card hidden" style="margin-top:18px"></div>
+  </section>
+
+  <section id="responsesView" class="hidden">
+    <div class="card">
+      <h2>Svaroversikt</h2>
+      <p class="muted">I v1.0 lagres svar på denne enheten. Når Firebase kobles til kan læreren se innleveringene fra alle elevenes enheter.</p>
+      <div id="responsesTable"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get tasks(){ return JSON.parse(localStorage.getItem('sg_tasks') || '{}'); },
+  set tasks(v){ localStorage.setItem('sg_tasks', JSON.stringify(v)); },
+  get responses(){ return JSON.parse(localStorage.getItem('sg_responses') || '[]'); },
+  set responses(v){ localStorage.setItem('sg_responses', JSON.stringify(v)); }
+};
+
+function showView(name){
+  ['teacherView','studentView','responsesView'].forEach(id => $(id).classList.add('hidden'));
+  ['navTeacher','navStudent','navResponses'].forEach(id => $(id).classList.remove('active'));
+  $(name+'View').classList.remove('hidden');
+  $('nav'+name[0].toUpperCase()+name.slice(1)).classList.add('active');
+  if(name==='responses') renderResponses();
+}
+$('navTeacher').onclick=()=>showView('teacher');
+$('navStudent').onclick=()=>showView('student');
+$('navResponses').onclick=()=>showView('responses');
+
+function cleanSentences(text){
+  return text
+    .replace(/\s+/g,' ')
+    .split(/(?<=[.!?])\s+/)
+    .map(s=>s.trim())
+    .filter(s=>s.length>35 && s.length<260);
+}
+function keyword(sentence){
+  const stop = new Set('dette denne disse eller også fordi mellom gjennom under over etter før noen mange være blir blitt hadde har som til fra med for ikke det den de en et og av på i er var om kan skal'.split(' '));
+  const words = sentence.toLowerCase().match(/[a-zæøå0-9-]{4,}/g) || [];
+  const candidates = words.filter(w=>!stop.has(w));
+  return candidates.sort((a,b)=>b.length-a.length)[0] || words[0] || 'temaet';
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+function makeQuestions(text,type,count){
+  const sentences = cleanSentences(text);
+  if(sentences.length < 2) throw new Error('Teksten er for kort. Lim inn minst noen avsnitt med fagtekst.');
+  const qs=[];
+  let si=0;
+  for(let i=0;i<count;i++){
+    const s=sentences[si++ % sentences.length];
+    const kw=keyword(s);
+    const useMC = type==='mc' || (type==='both' && i%2===0);
+    if(useMC){
+      const other = sentences.filter(x=>x!==s).slice(0,3).map(x=>keyword(x)).filter(Boolean);
+      const distractors = [...new Set(other.concat(['temperatur','energi','prosess','miljø']))].filter(x=>x!==kw).slice(0,3);
+      const options=[cap(kw),...distractors.map(cap)].sort(()=>Math.random()-.5);
+      qs.push({
+        type:'mc',
+        prompt:`Hvilket begrep passer best til denne påstanden: «${s}»`,
+        options,
+        answer:cap(kw)
+      });
+    }else{
+      qs.push({
+        type:'text',
+        prompt:`Forklar med egne ord hva denne delen av teksten betyr: «${s}»`,
+        modelAnswer:s
+      });
+    }
+  }
+  return qs;
+}
+function codeFromTitle(title){
+  const letters=(title.match(/[A-Za-zÆØÅæøå]/g)||['O','P','P']).slice(0,3).join('').toUpperCase();
+  return `${letters}-${Math.floor(1000+Math.random()*9000)}`;
+}
+function renderPreview(task){
+  $('preview').innerHTML = task.questions.map((q,i)=>`
+    <div class="q">
+      <h4>${i+1}. ${q.prompt}</h4>
+      ${q.type==='mc'
+        ? q.options.map(o=>`<div class="option">${o}</div>`).join('')
+        : `<textarea disabled placeholder="Eleven skriver svaret her"></textarea>`
+      }
+      <div class="small muted">Type: ${q.type==='mc'?'Multiple choice':'Tekstsvar'}</div>
+    </div>`).join('');
+}
+$('generateBtn').onclick=()=>{
+  try{
+    const title=$('taskTitle').value.trim()||'Uten tittel';
+    const text=$('sourceText').value.trim();
+    if(!text) return alert('Lim inn en fagtekst først.');
+    const type=$('questionType').value;
+    const count=Number($('questionCount').value);
+    const difficulty=$('difficulty').value;
+    const questions=makeQuestions(text,type,count);
+    const code=codeFromTitle(title);
+    const task={code,title,text,type,count,difficulty,questions,created:new Date().toISOString()};
+    const tasks=store.tasks; tasks[code]=task; store.tasks=tasks;
+    $('taskEmpty').classList.add('hidden');
+    $('taskCreated').classList.remove('hidden');
+    $('taskCodeLabel').textContent=code;
+    $('taskSummary').textContent=`${title} · ${count} spørsmål · ${difficulty}`;
+    $('taskCreated').dataset.code=code;
+    renderPreview(task);
+  }catch(e){alert(e.message)}
+};
+$('copyCodeBtn').onclick=async()=>{
+  const code=$('taskCreated').dataset.code;
+  try{await navigator.clipboard.writeText(code); $('copyCodeBtn').textContent='Kopiert!'; setTimeout(()=>$('copyCodeBtn').textContent='Kopier kode',1200)}catch(e){}
+};
+$('deleteTaskBtn').onclick=()=>{
+  const code=$('taskCreated').dataset.code;
+  if(!confirm(`Slette oppgaven ${code}?`)) return;
+  const tasks=store.tasks; delete tasks[code]; store.tasks=tasks;
+  $('taskCreated').classList.add('hidden'); $('taskEmpty').classList.remove('hidden'); $('preview').innerHTML='<span class="muted">Spørsmålene vises her.</span>';
+};
+
+let currentTask=null;
+$('openTaskBtn').onclick=()=>{
+  const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
+  if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
+  const task=store.tasks[code];
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.0 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  currentTask=task;
+  $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
+  $('studentTaskTitle').textContent=task.title;
+  $('studentTaskMeta').textContent=`Kode ${task.code} · ${task.questions.length} spørsmål`;
+  $('studentForm').innerHTML=task.questions.map((q,i)=>`
+    <div class="q">
+      <h4>${i+1}. ${q.prompt}</h4>
+      ${q.type==='mc'
+        ? q.options.map(o=>`<label class="option"><input type="radio" name="q${i}" value="${o.replace(/"/g,'&quot;')}"> ${o}</label>`).join('')
+        : `<textarea name="q${i}" placeholder="Skriv svaret ditt"></textarea>`
+      }
+    </div>`).join('');
+  $('studentMessage').innerHTML='';
+};
+$('submitBtn').onclick=(ev)=>{
+  ev.preventDefault();
+  if(!currentTask) return;
+  const fd=new FormData($('studentForm'));
+  const answers=currentTask.questions.map((q,i)=>fd.get('q'+i)||'');
+  if(answers.some(a=>!String(a).trim())){alert('Svar på alle spørsmål før du leverer.');return}
+  let mcTotal=0, mcCorrect=0;
+  const details=currentTask.questions.map((q,i)=>{
+    if(q.type==='mc'){mcTotal++; const ok=answers[i]===q.answer; if(ok)mcCorrect++; return {type:'mc',answer:answers[i],correct:ok,correctAnswer:q.answer,prompt:q.prompt}}
+    return {type:'text',answer:answers[i],prompt:q.prompt,teacherFeedback:'',status:'Til vurdering'};
+  });
+  const response={
+    id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
+    code:currentTask.code,title:currentTask.title,name:$('studentName').value.trim(),
+    submitted:new Date().toISOString(),mcTotal,mcCorrect,details
+  };
+  const rs=store.responses; rs.push(response); store.responses=rs;
+  $('studentTaskCard').classList.add('hidden');
+  $('studentResult').classList.remove('hidden');
+  $('studentResult').innerHTML=`
+    <h2>Levert</h2>
+    <p>Takk, ${response.name}. Besvarelsen er registrert.</p>
+    ${mcTotal?`<p class="score">Multiple choice: ${mcCorrect} av ${mcTotal} riktige</p>`:''}
+    <p class="muted">Tekstsvar må vurderes av lærer.</p>`;
+};
+
+function renderResponses(){
+  const rs=store.responses;
+  if(!rs.length){$('responsesTable').innerHTML='<p class="muted">Ingen besvarelser ennå.</p>';return}
+  $('responsesTable').innerHTML=`
+    <table>
+      <thead><tr><th>Elev</th><th>Oppgave</th><th>MC</th><th>Levert</th><th></th></tr></thead>
+      <tbody>${rs.map((r,idx)=>`
+        <tr>
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.title)}<br><span class="small muted">${r.code}</span></td>
+          <td>${r.mcTotal?`${r.mcCorrect}/${r.mcTotal}`:'–'}</td>
+          <td>${new Date(r.submitted).toLocaleString('no-NO')}</td>
+          <td><button class="secondary" onclick="viewResponse(${idx})">Se svar</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div id="responseDetail" style="margin-top:18px"></div>`;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+window.viewResponse=(idx)=>{
+  const r=store.responses[idx];
+  $('responseDetail').innerHTML=`
+    <div class="card">
+      <h3>${escapeHtml(r.name)} – ${escapeHtml(r.title)}</h3>
+      ${r.details.map((d,i)=>`
+        <div class="q">
+          <h4>${i+1}. ${escapeHtml(d.prompt)}</h4>
+          <p><strong>Svar:</strong> ${escapeHtml(d.answer)}</p>
+          ${d.type==='mc'
+            ? `<p class="${d.correct?'pill ok':'pill warn'}">${d.correct?'Riktig':'Feil'}${d.correct?'':` · Fasit: ${escapeHtml(d.correctAnswer)}`}</p>`
+            : `<label>Tilbakemelding fra lærer</label>
+               <textarea id="fb_${idx}_${i}" placeholder="Skriv tilbakemelding...">${escapeHtml(d.teacherFeedback||'')}</textarea>
+               <button class="secondary" onclick="saveFeedback(${idx},${i})">Lagre tilbakemelding</button>`
+          }
+        </div>`).join('')}
+    </div>`;
+}
+window.saveFeedback=(ri,di)=>{
+  const rs=store.responses;
+  rs[ri].details[di].teacherFeedback=$(`fb_${ri}_${di}`).value;
+  rs[ri].details[di].status='Vurdert';
+  store.responses=rs;
+  alert('Tilbakemeldingen er lagret.');
+};
+</script>
+</body>
+</html>
