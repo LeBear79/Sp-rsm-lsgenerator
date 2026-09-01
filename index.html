@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.0</title>
+  <title>Spørsmålsgenerator v1.1</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -19,8 +19,7 @@
     h1{font-size:1.3rem;margin:0}
     .version{font-size:.85rem;color:#cbd5e1}
     nav{display:flex;gap:8px;flex-wrap:wrap}
-    nav button,.tabbtn{border:0;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
-    nav button{background:#1e293b;color:#fff}
+    nav button{border:0;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700;background:#1e293b;color:#fff}
     nav button.active{background:#fff;color:#0f172a}
     main{padding:24px 16px 40px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
@@ -51,7 +50,10 @@
     .small{font-size:.88rem}
     .notice{padding:12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
     .warnbox{padding:12px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
-    code{background:#e2e8f0;padding:2px 5px;border-radius:5px}
+    .successbox{padding:12px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+    .source-tabs{display:flex;gap:8px;margin-bottom:12px}
+    .source-tabs button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer}
+    .source-tabs button.active{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
   </style>
 </head>
 <body>
@@ -59,7 +61,7 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.0</div>
+      <div class="version">v1.1</div>
     </div>
     <nav>
       <button id="navTeacher" class="active">Lærer</button>
@@ -74,13 +76,35 @@
     <div class="grid">
       <div class="card">
         <h2>Lag en oppgave</h2>
-        <p class="muted">Lim inn en fagtekst. v1.0 lager spørsmål lokalt i nettleseren. Senere kan KI kobles på uten å legge API-nøkkel i nettsiden.</p>
+        <p class="muted">Velg om innholdet skal hentes fra en tekst du limer inn, eller fra en nettside.</p>
 
         <label for="taskTitle">Tittel</label>
         <input id="taskTitle" placeholder="Eksempel: Økosystemer" />
 
-        <label for="sourceText">Fagtekst</label>
-        <textarea id="sourceText" placeholder="Lim inn teksten her..."></textarea>
+        <label>Kilde</label>
+        <div class="source-tabs">
+          <button id="sourceTextBtn" class="active" type="button">Lim inn tekst</button>
+          <button id="sourceWebBtn" type="button">Nettside</button>
+        </div>
+
+        <div id="textSource">
+          <label for="sourceText">Fagtekst</label>
+          <textarea id="sourceText" placeholder="Lim inn teksten her..."></textarea>
+        </div>
+
+        <div id="webSource" class="hidden">
+          <label for="sourceUrl">Nettadresse</label>
+          <input id="sourceUrl" type="url" placeholder="https://..." />
+          <div style="margin-top:10px">
+            <button class="secondary" id="fetchUrlBtn" type="button">Hent tekst fra nettsiden</button>
+          </div>
+          <div id="fetchStatus" style="margin-top:10px"></div>
+          <label for="webText">Hentet tekst</label>
+          <textarea id="webText" placeholder="Teksten fra nettsiden vises her. Du kan redigere den før spørsmålene lages."></textarea>
+          <div class="notice small" style="margin-top:10px">
+            Noen nettsider blokkerer automatisk innhenting fra GitHub Pages. Da vil appen gi beskjed, og du kan lime inn teksten manuelt. En senere Firebase-versjon kan løse dette mer robust.
+          </div>
+        </div>
 
         <div class="row">
           <div>
@@ -163,7 +187,7 @@
   <section id="responsesView" class="hidden">
     <div class="card">
       <h2>Svaroversikt</h2>
-      <p class="muted">I v1.0 lagres svar på denne enheten. Når Firebase kobles til kan læreren se innleveringene fra alle elevenes enheter.</p>
+      <p class="muted">I v1.1 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
       <div id="responsesTable"></div>
     </div>
   </section>
@@ -171,6 +195,8 @@
 
 <script>
 const $ = id => document.getElementById(id);
+let sourceMode = 'text';
+
 const store = {
   get tasks(){ return JSON.parse(localStorage.getItem('sg_tasks') || '{}'); },
   set tasks(v){ localStorage.setItem('sg_tasks', JSON.stringify(v)); },
@@ -188,6 +214,59 @@ function showView(name){
 $('navTeacher').onclick=()=>showView('teacher');
 $('navStudent').onclick=()=>showView('student');
 $('navResponses').onclick=()=>showView('responses');
+
+$('sourceTextBtn').onclick = () => {
+  sourceMode='text';
+  $('sourceTextBtn').classList.add('active');
+  $('sourceWebBtn').classList.remove('active');
+  $('textSource').classList.remove('hidden');
+  $('webSource').classList.add('hidden');
+};
+$('sourceWebBtn').onclick = () => {
+  sourceMode='web';
+  $('sourceWebBtn').classList.add('active');
+  $('sourceTextBtn').classList.remove('active');
+  $('webSource').classList.remove('hidden');
+  $('textSource').classList.add('hidden');
+};
+
+function extractReadableText(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script,style,noscript,svg,nav,footer,header,form,aside').forEach(el=>el.remove());
+  const candidates = [...doc.querySelectorAll('article,main,[role="main"]')];
+  let root = candidates.find(el => (el.innerText || '').trim().length > 400) || doc.body;
+  let text = (root.innerText || '')
+    .replace(/\n{3,}/g,'\n\n')
+    .replace(/[ \t]{2,}/g,' ')
+    .trim();
+  return text;
+}
+
+$('fetchUrlBtn').onclick = async () => {
+  let url = $('sourceUrl').value.trim();
+  if(!url) return alert('Skriv inn en nettadresse først.');
+  if(!/^https?:\/\//i.test(url)) url='https://'+url;
+  $('sourceUrl').value=url;
+  $('fetchStatus').innerHTML='<span class="pill warn">Henter...</span>';
+
+  try{
+    const res = await fetch(url, {method:'GET'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const html = await res.text();
+    const text = extractReadableText(html);
+    if(text.length < 150) throw new Error('For lite lesbar tekst funnet');
+    $('webText').value = text.slice(0, 30000);
+    $('fetchStatus').innerHTML='<div class="successbox">Teksten ble hentet. Se gjennom teksten før du lager spørsmål.</div>';
+    if(!$('taskTitle').value.trim()){
+      try{
+        const doc = new DOMParser().parseFromString(html,'text/html');
+        $('taskTitle').value=(doc.querySelector('h1')?.innerText || doc.title || '').trim().slice(0,100);
+      }catch(e){}
+    }
+  }catch(err){
+    $('fetchStatus').innerHTML='<div class="warnbox">Denne nettsiden lot seg ikke hente direkte. Det skyldes vanligvis sikkerhetsinnstillinger på nettstedet (CORS). Lim inn teksten manuelt i feltet under, eller prøv en annen nettside.</div>';
+  }
+};
 
 function cleanSentences(text){
   return text
@@ -250,14 +329,19 @@ function renderPreview(task){
 $('generateBtn').onclick=()=>{
   try{
     const title=$('taskTitle').value.trim()||'Uten tittel';
-    const text=$('sourceText').value.trim();
-    if(!text) return alert('Lim inn en fagtekst først.');
+    const text=(sourceMode==='text' ? $('sourceText').value : $('webText').value).trim();
+    if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');
     const type=$('questionType').value;
     const count=Number($('questionCount').value);
     const difficulty=$('difficulty').value;
     const questions=makeQuestions(text,type,count);
     const code=codeFromTitle(title);
-    const task={code,title,text,type,count,difficulty,questions,created:new Date().toISOString()};
+    const task={
+      code,title,text,type,count,difficulty,questions,
+      sourceMode,
+      sourceUrl:sourceMode==='web' ? $('sourceUrl').value.trim() : '',
+      created:new Date().toISOString()
+    };
     const tasks=store.tasks; tasks[code]=task; store.tasks=tasks;
     $('taskEmpty').classList.add('hidden');
     $('taskCreated').classList.remove('hidden');
@@ -283,7 +367,7 @@ $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.0 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.1 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
