@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.5</title>
+  <title>Spørsmålsgenerator v1.6</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -74,6 +74,16 @@
     .login-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
     .login-actions button{flex:1}
 
+
+    .task-list{display:grid;gap:12px;margin-top:14px}
+    .task-item{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#fff}
+    .task-item h3{margin:0 0 4px}
+    .task-meta{font-size:.9rem;color:#64748b;margin-bottom:10px}
+    .task-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .danger{background:#fff;color:#b91c1c;border:1px solid #fecaca}
+    .archive-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+    .archive-toolbar > div{flex:1;min-width:180px}
+    
 </style>
 </head>
 <body>
@@ -81,11 +91,12 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.5</div>
+      <div class="version">v1.6</div>
     </div>
     <nav>
       <button id="navStudent" class="active">Elev</button>
       <button id="navTeacher">Lærer</button>
+      <button id="navArchive" class="teacher-only">Mine oppgavesett</button>
       <button id="navResponses" class="teacher-only">Svaroversikt</button>
       <button id="teacherLogoutBtn" class="teacher-only logout-btn">Logg ut lærer</button>
     </nav>
@@ -237,10 +248,35 @@ FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
     <div id="studentResult" class="card hidden" style="margin-top:18px"></div>
   </section>
 
+
+  <section id="archiveView" class="hidden">
+    <div class="card">
+      <h2>Mine oppgavesett</h2>
+      <p class="muted">Her finner du oppgavene som er laget i denne nettleseren. Du kan åpne dem igjen, lage en kopi eller slette dem.</p>
+
+      <div class="archive-toolbar">
+        <div>
+          <label for="archiveSearch">Søk</label>
+          <input id="archiveSearch" placeholder="Søk etter tittel eller oppgavekode">
+        </div>
+        <div>
+          <label for="archiveSort">Sorter</label>
+          <select id="archiveSort">
+            <option value="newest">Nyeste først</option>
+            <option value="oldest">Eldste først</option>
+            <option value="title">Tittel A–Å</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="archiveList" class="task-list"></div>
+    </div>
+  </section>
+
   <section id="responsesView" class="hidden">
     <div class="card">
       <h2>Svaroversikt</h2>
-      <p class="muted">Svarene lagres på denne enheten. Lærer-PIN beskytter lærersiden og svaroversikten mot vanlig elevtilgang.</p>
+      <p class="muted">Svarene lagres på denne enheten. Lærer-PIN beskytter lærersiden, oppgavearkivet og svaroversikten mot vanlig elevtilgang.</p>
       <div id="responsesTable"></div>
     </div>
   </section>
@@ -289,10 +325,11 @@ const store = {
 };
 
 function showView(name){
-  ['teacherView','studentView','responsesView'].forEach(id => $(id).classList.add('hidden'));
-  ['navTeacher','navStudent','navResponses'].forEach(id => $(id).classList.remove('active'));
+  ['teacherView','studentView','archiveView','responsesView'].forEach(id => $(id).classList.add('hidden'));
+  ['navTeacher','navStudent','navArchive','navResponses'].forEach(id => $(id).classList.remove('active'));
   $(name+'View').classList.remove('hidden');
   $('nav'+name[0].toUpperCase()+name.slice(1)).classList.add('active');
+  if(name==='archive') renderArchive();
   if(name==='responses') renderResponses();
 }
 
@@ -347,6 +384,7 @@ function requireTeacher(view='teacher'){
 
 $('navTeacher').onclick=()=>requireTeacher('teacher');
 $('navStudent').onclick=()=>showView('student');
+$('navArchive').onclick=()=>requireTeacher('archive');
 $('navResponses').onclick=()=>requireTeacher('responses');
 
 $('teacherLoginCancelBtn').onclick=closeTeacherLogin;
@@ -882,7 +920,7 @@ $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.5 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.6 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
@@ -921,6 +959,112 @@ $('submitBtn').onclick=(ev)=>{
     <p>Takk, ${response.name}. Besvarelsen er registrert.</p>
     ${mcTotal?`<p class="score">Multiple choice: ${mcCorrect} av ${mcTotal} riktige</p>`:''}
     <p class="muted">Tekstsvar må vurderes av lærer.</p>`;
+};
+
+
+function formatTaskDate(iso){
+  try{
+    return new Date(iso).toLocaleString('no-NO',{dateStyle:'short',timeStyle:'short'});
+  }catch(e){ return ''; }
+}
+
+function renderArchive(){
+  const listEl=$('archiveList');
+  const search=($('archiveSearch').value||'').trim().toLowerCase();
+  const sort=$('archiveSort').value;
+  let items=Object.values(store.tasks);
+
+  if(search){
+    items=items.filter(t =>
+      String(t.title||'').toLowerCase().includes(search) ||
+      String(t.code||'').toLowerCase().includes(search)
+    );
+  }
+
+  if(sort==='oldest'){
+    items.sort((a,b)=>new Date(a.created||0)-new Date(b.created||0));
+  }else if(sort==='title'){
+    items.sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''),'no'));
+  }else{
+    items.sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
+  }
+
+  if(!items.length){
+    listEl.innerHTML='<p class="muted">Ingen oppgavesett funnet.</p>';
+    return;
+  }
+
+  listEl.innerHTML=items.map(t=>`
+    <div class="task-item">
+      <h3>${escapeHtml(t.title||'Uten tittel')}</h3>
+      <div class="task-meta">
+        Kode: <strong>${escapeHtml(t.code||'')}</strong>
+        · ${Array.isArray(t.questions)?t.questions.length:0} spørsmål
+        · ${escapeHtml(t.difficulty||'')}
+        · ${formatTaskDate(t.created)}
+      </div>
+      <div class="task-actions">
+        <button type="button" onclick="openArchivedTask('${escapeHtml(t.code)}')">Åpne og rediger</button>
+        <button type="button" class="secondary" onclick="duplicateArchivedTask('${escapeHtml(t.code)}')">Lag kopi</button>
+        <button type="button" class="danger" onclick="deleteArchivedTask('${escapeHtml(t.code)}')">Slett</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+$('archiveSearch').addEventListener('input',renderArchive);
+$('archiveSort').addEventListener('change',renderArchive);
+
+window.openArchivedTask=(code)=>{
+  const task=store.tasks[code];
+  if(!task) return alert('Fant ikke oppgaven.');
+
+  $('taskTitle').value=task.title||'';
+  $('questionCount').value=String(task.count||task.questions?.length||8);
+  $('difficulty').value=task.difficulty||'Middels';
+
+  if(task.sourceMode==='web'){
+    sourceMode='web';
+    $('sourceWebBtn').click();
+    $('sourceUrl').value=task.sourceUrl||'';
+    $('webText').value=task.text||'';
+  }else{
+    sourceMode='text';
+    $('sourceTextBtn').click();
+    $('sourceText').value=task.text||'';
+  }
+
+  $('taskEmpty').classList.add('hidden');
+  $('taskCreated').classList.remove('hidden');
+  $('taskCodeLabel').textContent=task.code;
+  $('taskSummary').textContent=`${task.title} · ${task.questions.length} spørsmål · ${task.difficulty||''}`;
+  $('taskCreated').dataset.code=task.code;
+  renderPreview(task);
+  showView('teacher');
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+
+window.duplicateArchivedTask=(code)=>{
+  const original=store.tasks[code];
+  if(!original) return alert('Fant ikke oppgaven.');
+  const copy=JSON.parse(JSON.stringify(original));
+  copy.code=codeFromTitle(copy.title||'Oppgave');
+  copy.title=(copy.title||'Oppgave')+' – kopi';
+  copy.created=new Date().toISOString();
+  const tasks=store.tasks;
+  tasks[copy.code]=copy;
+  store.tasks=tasks;
+  renderArchive();
+};
+
+window.deleteArchivedTask=(code)=>{
+  const task=store.tasks[code];
+  if(!task) return;
+  if(!confirm(`Vil du slette oppgavesettet "${task.title}"?`)) return;
+  const tasks=store.tasks;
+  delete tasks[code];
+  store.tasks=tasks;
+  renderArchive();
 };
 
 function renderResponses(){
