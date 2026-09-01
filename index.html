@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.4.1</title>
+  <title>Spørsmålsgenerator v1.5</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -62,29 +62,42 @@
     .chat-import textarea{min-height:220px}
     .format-example{white-space:pre-wrap;background:#fff;border:1px solid #dbeafe;border-radius:10px;padding:10px;font-size:.88rem;margin-top:10px}
     .successbox{padding:10px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;margin-top:10px}
-  </style>
+  
+    .teacher-only{display:none}
+    body.teacher-auth .teacher-only{display:inline-flex}
+    .logout-btn{background:#fff;color:#991b1b;border:1px solid #fecaca}
+    .login-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999}
+    .login-overlay.hidden{display:none}
+    .login-box{width:min(430px,100%);background:#fff;border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.24)}
+    .login-box h2{margin-top:0}
+    .pin-input{font-size:1.35rem;letter-spacing:.25em;text-align:center}
+    .login-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .login-actions button{flex:1}
+
+</style>
 </head>
 <body>
 <header>
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.4.1</div>
+      <div class="version">v1.5</div>
     </div>
     <nav>
-      <button id="navTeacher" class="active">Lærer</button>
-      <button id="navStudent">Elev</button>
-      <button id="navResponses">Svaroversikt</button>
+      <button id="navStudent" class="active">Elev</button>
+      <button id="navTeacher">Lærer</button>
+      <button id="navResponses" class="teacher-only">Svaroversikt</button>
+      <button id="teacherLogoutBtn" class="teacher-only logout-btn">Logg ut lærer</button>
     </nav>
   </div>
 </header>
 
 <main class="wrap">
-  <section id="teacherView">
+  <section id="teacherView" class="hidden">
     <div class="grid">
       <div class="card">
         <h2>Lag en oppgave</h2>
-        <p class="muted">Velg om innholdet skal hentes fra en tekst du limer inn, eller fra en nettside. v1.3 lager kortere og mer naturlige spørsmål.</p>
+        <p class="muted">Lag og rediger oppgaver. Lærerdelen er beskyttet med PIN-kode.</p>
 
         <label for="taskTitle">Tittel</label>
         <input id="taskTitle" placeholder="Eksempel: Økosystemer" />
@@ -195,7 +208,7 @@ FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
     </div>
   </section>
 
-  <section id="studentView" class="hidden">
+  <section id="studentView">
     <div class="card">
       <h2>Åpne oppgave</h2>
       <div class="row">
@@ -227,10 +240,41 @@ FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
   <section id="responsesView" class="hidden">
     <div class="card">
       <h2>Svaroversikt</h2>
-      <p class="muted">I v1.4.1 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
+      <p class="muted">Svarene lagres på denne enheten. Lærer-PIN beskytter lærersiden og svaroversikten mot vanlig elevtilgang.</p>
       <div id="responsesTable"></div>
     </div>
   </section>
+
+  <div id="teacherLoginOverlay" class="login-overlay hidden" aria-modal="true" role="dialog">
+    <div class="login-box">
+      <div id="teacherLoginMode">
+        <h2>Lærerinnlogging</h2>
+        <p class="muted">Skriv inn lærer-PIN for å åpne lærersiden og svaroversikten.</p>
+        <label for="teacherPin">PIN-kode</label>
+        <input id="teacherPin" class="pin-input" type="password" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="off">
+        <div id="teacherLoginMessage" style="margin-top:10px"></div>
+        <div class="login-actions">
+          <button id="teacherLoginBtn" type="button">Logg inn</button>
+          <button id="teacherLoginCancelBtn" class="secondary" type="button">Avbryt</button>
+        </div>
+      </div>
+
+      <div id="teacherSetupMode" class="hidden">
+        <h2>Opprett lærer-PIN</h2>
+        <p class="muted">Dette gjøres bare første gang på denne nettleseren. Velg en PIN på 4–6 sifre.</p>
+        <label for="teacherPinNew">Ny PIN</label>
+        <input id="teacherPinNew" class="pin-input" type="password" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="new-password">
+        <label for="teacherPinRepeat">Gjenta PIN</label>
+        <input id="teacherPinRepeat" class="pin-input" type="password" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="new-password">
+        <div id="teacherSetupMessage" style="margin-top:10px"></div>
+        <div class="login-actions">
+          <button id="teacherSetupBtn" type="button">Lagre PIN</button>
+          <button id="teacherSetupCancelBtn" class="secondary" type="button">Avbryt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -251,9 +295,111 @@ function showView(name){
   $('nav'+name[0].toUpperCase()+name.slice(1)).classList.add('active');
   if(name==='responses') renderResponses();
 }
-$('navTeacher').onclick=()=>showView('teacher');
+
+const teacherAuth = {
+  get pinHash(){ return localStorage.getItem('sg_teacher_pin_hash') || ''; },
+  set pinHash(v){ localStorage.setItem('sg_teacher_pin_hash', v); },
+  get loggedIn(){ return sessionStorage.getItem('sg_teacher_logged_in') === '1'; },
+  set loggedIn(v){
+    if(v) sessionStorage.setItem('sg_teacher_logged_in','1');
+    else sessionStorage.removeItem('sg_teacher_logged_in');
+    document.body.classList.toggle('teacher-auth', !!v);
+  }
+};
+
+async function hashPin(pin){
+  const data = new TextEncoder().encode(pin);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function openTeacherLogin(){
+  $('teacherLoginMessage').innerHTML='';
+  $('teacherSetupMessage').innerHTML='';
+  $('teacherPin').value='';
+  $('teacherPinNew').value='';
+  $('teacherPinRepeat').value='';
+
+  if(teacherAuth.pinHash){
+    $('teacherLoginMode').classList.remove('hidden');
+    $('teacherSetupMode').classList.add('hidden');
+    setTimeout(()=>$('teacherPin').focus(),50);
+  }else{
+    $('teacherLoginMode').classList.add('hidden');
+    $('teacherSetupMode').classList.remove('hidden');
+    setTimeout(()=>$('teacherPinNew').focus(),50);
+  }
+  $('teacherLoginOverlay').classList.remove('hidden');
+}
+
+function closeTeacherLogin(){
+  $('teacherLoginOverlay').classList.add('hidden');
+}
+
+function requireTeacher(view='teacher'){
+  if(teacherAuth.loggedIn){
+    showView(view);
+  }else{
+    $('teacherLoginOverlay').dataset.targetView=view;
+    openTeacherLogin();
+  }
+}
+
+$('navTeacher').onclick=()=>requireTeacher('teacher');
 $('navStudent').onclick=()=>showView('student');
-$('navResponses').onclick=()=>showView('responses');
+$('navResponses').onclick=()=>requireTeacher('responses');
+
+$('teacherLoginCancelBtn').onclick=closeTeacherLogin;
+$('teacherSetupCancelBtn').onclick=closeTeacherLogin;
+
+$('teacherSetupBtn').onclick=async()=>{
+  const pin=$('teacherPinNew').value.trim();
+  const repeat=$('teacherPinRepeat').value.trim();
+  if(!/^\d{4,6}$/.test(pin)){
+    $('teacherSetupMessage').innerHTML='<div class="warnbox">PIN-koden må bestå av 4–6 sifre.</div>';
+    return;
+  }
+  if(pin!==repeat){
+    $('teacherSetupMessage').innerHTML='<div class="warnbox">PIN-kodene er ikke like.</div>';
+    return;
+  }
+  teacherAuth.pinHash=await hashPin(pin);
+  teacherAuth.loggedIn=true;
+  closeTeacherLogin();
+  showView($('teacherLoginOverlay').dataset.targetView || 'teacher');
+};
+
+$('teacherLoginBtn').onclick=async()=>{
+  const pin=$('teacherPin').value.trim();
+  if(!pin){
+    $('teacherLoginMessage').innerHTML='<div class="warnbox">Skriv inn PIN-koden.</div>';
+    return;
+  }
+  const hash=await hashPin(pin);
+  if(hash!==teacherAuth.pinHash){
+    $('teacherLoginMessage').innerHTML='<div class="warnbox">Feil PIN-kode.</div>';
+    $('teacherPin').select();
+    return;
+  }
+  teacherAuth.loggedIn=true;
+  closeTeacherLogin();
+  showView($('teacherLoginOverlay').dataset.targetView || 'teacher');
+};
+
+$('teacherPin').addEventListener('keydown', e=>{
+  if(e.key==='Enter') $('teacherLoginBtn').click();
+});
+$('teacherPinRepeat').addEventListener('keydown', e=>{
+  if(e.key==='Enter') $('teacherSetupBtn').click();
+});
+
+$('teacherLogoutBtn').onclick=()=>{
+  teacherAuth.loggedIn=false;
+  showView('student');
+};
+
+teacherAuth.loggedIn = teacherAuth.loggedIn;
+showView('student');
 
 
 $('copyChatPromptBtn').onclick=async()=>{
@@ -736,7 +882,7 @@ $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.4.1 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.5 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
