@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.4</title>
+  <title>Spørsmålsgenerator v1.4.1</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -69,7 +69,7 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.4</div>
+      <div class="version">v1.4.1</div>
     </div>
     <nav>
       <button id="navTeacher" class="active">Lærer</button>
@@ -116,7 +116,7 @@
 
         <div class="chat-import">
           <strong>Lag spørsmål med ChatGPT</strong>
-          <p class="small" style="margin:6px 0 10px">Ingen API eller installasjon er nødvendig. Kopier instruksjonen, bruk den sammen med fagteksten i ChatGPT, og lim deretter svaret inn her.</p>
+          <p class="small" style="margin:6px 0 10px">Ingen API eller installasjon er nødvendig. Knappen kopierer én ferdig prompt som inneholder både fagteksten og valgene dine for antall, vanskelighetsgrad og oppgavetype.</p>
           <button id="copyChatPromptBtn" class="secondary" type="button">Kopier instruksjon til ChatGPT</button>
 
           <label for="chatImport" style="margin-top:12px">Lim inn spørsmål fra ChatGPT</label>
@@ -227,7 +227,7 @@ FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
   <section id="responsesView" class="hidden">
     <div class="card">
       <h2>Svaroversikt</h2>
-      <p class="muted">I v1.4 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
+      <p class="muted">I v1.4.1 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
       <div id="responsesTable"></div>
     </div>
   </section>
@@ -257,13 +257,26 @@ $('navResponses').onclick=()=>showView('responses');
 
 
 $('copyChatPromptBtn').onclick=async()=>{
-  const txt=chatPromptText();
   try{
+    const txt=chatPromptText();
+    const count=Number($('questionCount').value)||8;
+    const difficulty=$('difficulty').value;
+    const typeLabel=$('questionType').options[$('questionType').selectedIndex].text;
+
     await navigator.clipboard.writeText(txt);
-    $('chatImportStatus').innerHTML='<div class="successbox">Instruksjonen er kopiert. Lim den inn i ChatGPT, legg fagteksten under TEKST, og kopier svaret tilbake hit.</div>';
+    $('chatImportStatus').innerHTML=`<div class="successbox">Hele prompten er kopiert – inkludert fagteksten og valgene dine: ${count} spørsmål, ${escapeHtml(difficulty)}, ${escapeHtml(typeLabel)}. Lim den rett inn i ChatGPT.</div>`;
   }catch(e){
-    $('chatImport').value=txt;
-    $('chatImportStatus').innerHTML='<div class="warnbox">Nettleseren tillot ikke automatisk kopiering. Instruksjonen er derfor lagt i feltet slik at du kan kopiere den manuelt.</div>';
+    if(e && e.message && (e.message.includes('fagteksten') || e.message.includes('teksten fra nettsiden'))){
+      $('chatImportStatus').innerHTML=`<div class="warnbox">${escapeHtml(e.message)}</div>`;
+      return;
+    }
+    try{
+      const txt=chatPromptText();
+      $('chatImport').value=txt;
+      $('chatImportStatus').innerHTML='<div class="warnbox">Nettleseren tillot ikke automatisk kopiering. Hele prompten, inkludert fagteksten og innstillingene, er lagt i feltet slik at du kan kopiere den manuelt.</div>';
+    }catch(inner){
+      $('chatImportStatus').innerHTML=`<div class="warnbox">${escapeHtml(inner.message)}</div>`;
+    }
   }
 };
 
@@ -459,19 +472,30 @@ function chatPromptText(){
   const type=$('questionType').value;
   const count=Number($('questionCount').value)||8;
   const difficulty=$('difficulty').value;
+  const sourceText=(sourceMode==='text' ? $('sourceText').value : $('webText').value).trim();
+
+  if(!sourceText){
+    throw new Error(sourceMode==='web'
+      ? 'Hent eller lim inn teksten fra nettsiden først.'
+      : 'Lim inn fagteksten først.');
+  }
+
   const typeText = type==='mc'
     ? 'Lag bare multiple choice-spørsmål.'
     : type==='text'
       ? 'Lag bare åpne tekstspørsmål.'
       : 'Lag en god blanding av multiple choice og åpne tekstspørsmål.';
 
-  return `Lag ${count} faglige spørsmål for norske ungdomsskoleelever ut fra teksten jeg limer inn etter denne instruksjonen.
+  return `Lag nøyaktig ${count} faglige spørsmål for norske ungdomsskoleelever ut fra fagteksten nederst.
 
-Krav:
+INNSTILLINGER:
+- Antall spørsmål: ${count}
+- Vanskelighetsgrad: ${difficulty}
+- Oppgavetype: ${typeText}
+
+KRAV:
 - Skriv korte, tydelige og naturlige spørsmål.
-- Vanskelighetsgrad: ${difficulty}.
-- ${typeText}
-- Bruk bare opplysninger som kan støttes av teksten.
+- Bruk bare opplysninger som kan støttes av fagteksten.
 - Ikke lag unødvendig lange spørsmål.
 
 For multiple choice:
@@ -501,8 +525,8 @@ FASIT: [kort fasit]
 
 Ikke bruk nummerering, tabeller eller ekstra forklaringer utenfor dette formatet.
 
-TEKST:
-[Lim inn fagteksten her]`;
+FAGTEKST:
+${sourceText}`;
 }
 
 function parseChatQuestions(raw){
@@ -712,7 +736,7 @@ $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.4 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.4.1 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
