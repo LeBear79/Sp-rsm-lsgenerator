@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.1</title>
+  <title>Spørsmålsgenerator v1.2</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -54,6 +54,10 @@
     .source-tabs{display:flex;gap:8px;margin-bottom:12px}
     .source-tabs button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer}
     .source-tabs button.active{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+    .editbox{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:12px;margin-top:10px}
+    .optionedit{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin:8px 0}
+    .optionedit input[type="radio"]{width:auto}
+    .editor-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   </style>
 </head>
 <body>
@@ -61,7 +65,7 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.1</div>
+      <div class="version">v1.2</div>
     </div>
     <nav>
       <button id="navTeacher" class="active">Lærer</button>
@@ -150,8 +154,13 @@
     </div>
 
     <div class="card" style="margin-top:18px">
-      <h3>Forhåndsvisning</h3>
+      <h3>Forhåndsvisning og redigering</h3>
+      <p class="muted">Du kan endre spørsmål, svaralternativer og fasit før elevene bruker oppgaven.</p>
       <div id="preview" class="muted">Spørsmålene vises her.</div>
+      <div id="editorButtons" class="editor-actions hidden">
+        <button class="primary" id="saveEditsBtn" type="button">Lagre endringer</button>
+        <button class="secondary" id="resetEditsBtn" type="button">Tilbakestill visning</button>
+      </div>
     </div>
   </section>
 
@@ -187,7 +196,7 @@
   <section id="responsesView" class="hidden">
     <div class="card">
       <h2>Svaroversikt</h2>
-      <p class="muted">I v1.1 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
+      <p class="muted">I v1.2 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
       <div id="responsesTable"></div>
     </div>
   </section>
@@ -317,14 +326,27 @@ function codeFromTitle(title){
 }
 function renderPreview(task){
   $('preview').innerHTML = task.questions.map((q,i)=>`
-    <div class="q">
-      <h4>${i+1}. ${q.prompt}</h4>
+    <div class="q" data-qindex="${i}">
+      <label>Spørsmål ${i+1}</label>
+      <textarea class="editPrompt" data-index="${i}" style="min-height:90px">${escapeHtml(q.prompt)}</textarea>
+
       ${q.type==='mc'
-        ? q.options.map(o=>`<div class="option">${o}</div>`).join('')
-        : `<textarea disabled placeholder="Eleven skriver svaret her"></textarea>`
+        ? `<div class="editbox">
+             <div class="small muted" style="margin-bottom:8px">Svaralternativer – velg radioknappen ved riktig svar.</div>
+             ${q.options.map((o,oi)=>`
+               <div class="optionedit">
+                 <input class="editOption" data-q="${i}" data-o="${oi}" value="${escapeHtml(o)}">
+                 <input type="radio" name="correct_${i}" data-q="${i}" data-o="${oi}" ${o===q.answer?'checked':''} title="Riktig svar">
+               </div>`).join('')}
+           </div>`
+        : `<div class="editbox">
+             <label>Forslag til fasit / lærergrunnlag</label>
+             <textarea class="editModelAnswer" data-index="${i}" style="min-height:90px">${escapeHtml(q.modelAnswer||'')}</textarea>
+           </div>`
       }
       <div class="small muted">Type: ${q.type==='mc'?'Multiple choice':'Tekstsvar'}</div>
     </div>`).join('');
+  $('editorButtons').classList.remove('hidden');
 }
 $('generateBtn').onclick=()=>{
   try{
@@ -351,6 +373,48 @@ $('generateBtn').onclick=()=>{
     renderPreview(task);
   }catch(e){alert(e.message)}
 };
+
+$('saveEditsBtn').onclick=()=>{
+  const code=$('taskCreated').dataset.code;
+  if(!code) return;
+  const tasks=store.tasks;
+  const task=tasks[code];
+  if(!task) return;
+
+  task.questions.forEach((q,i)=>{
+    const promptEl=document.querySelector(`.editPrompt[data-index="${i}"]`);
+    if(promptEl) q.prompt=promptEl.value.trim();
+
+    if(q.type==='mc'){
+      const optionEls=[...document.querySelectorAll(`.editOption[data-q="${i}"]`)];
+      q.options=optionEls.map(el=>el.value.trim()).filter(Boolean);
+
+      const checked=document.querySelector(`input[type="radio"][name="correct_${i}"]:checked`);
+      if(checked){
+        const oi=Number(checked.dataset.o);
+        q.answer=(optionEls[oi]?.value||'').trim();
+      }else if(q.options.length){
+        q.answer=q.options[0];
+      }
+    }else{
+      const modelEl=document.querySelector(`.editModelAnswer[data-index="${i}"]`);
+      if(modelEl) q.modelAnswer=modelEl.value.trim();
+    }
+  });
+
+  tasks[code]=task;
+  store.tasks=tasks;
+  currentTask=task;
+  renderPreview(task);
+  alert('Endringene er lagret.');
+};
+
+$('resetEditsBtn').onclick=()=>{
+  const code=$('taskCreated').dataset.code;
+  const task=store.tasks[code];
+  if(task) renderPreview(task);
+};
+
 $('copyCodeBtn').onclick=async()=>{
   const code=$('taskCreated').dataset.code;
   try{await navigator.clipboard.writeText(code); $('copyCodeBtn').textContent='Kopiert!'; setTimeout(()=>$('copyCodeBtn').textContent='Kopier kode',1200)}catch(e){}
@@ -359,7 +423,7 @@ $('deleteTaskBtn').onclick=()=>{
   const code=$('taskCreated').dataset.code;
   if(!confirm(`Slette oppgaven ${code}?`)) return;
   const tasks=store.tasks; delete tasks[code]; store.tasks=tasks;
-  $('taskCreated').classList.add('hidden'); $('taskEmpty').classList.remove('hidden'); $('preview').innerHTML='<span class="muted">Spørsmålene vises her.</span>';
+  $('taskCreated').classList.add('hidden'); $('taskEmpty').classList.remove('hidden'); $('preview').innerHTML='<span class="muted">Spørsmålene vises her.</span>'; $('editorButtons').classList.add('hidden');
 };
 
 let currentTask=null;
@@ -367,7 +431,7 @@ $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.1 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.2 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
