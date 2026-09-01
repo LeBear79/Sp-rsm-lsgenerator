@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.2</title>
+  <title>Spørsmålsgenerator v1.3</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -65,7 +65,7 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.2</div>
+      <div class="version">v1.3</div>
     </div>
     <nav>
       <button id="navTeacher" class="active">Lærer</button>
@@ -80,7 +80,7 @@
     <div class="grid">
       <div class="card">
         <h2>Lag en oppgave</h2>
-        <p class="muted">Velg om innholdet skal hentes fra en tekst du limer inn, eller fra en nettside.</p>
+        <p class="muted">Velg om innholdet skal hentes fra en tekst du limer inn, eller fra en nettside. v1.3 lager kortere og mer naturlige spørsmål.</p>
 
         <label for="taskTitle">Tittel</label>
         <input id="taskTitle" placeholder="Eksempel: Økosystemer" />
@@ -196,7 +196,7 @@
   <section id="responsesView" class="hidden">
     <div class="card">
       <h2>Svaroversikt</h2>
-      <p class="muted">I v1.2 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
+      <p class="muted">I v1.3 lagres svar fortsatt på denne enheten. Firebase blir neste steg for innlevering på tvers av elev- og lærerenheter.</p>
       <div id="responsesTable"></div>
     </div>
   </section>
@@ -282,44 +282,147 @@ function cleanSentences(text){
     .replace(/\s+/g,' ')
     .split(/(?<=[.!?])\s+/)
     .map(s=>s.trim())
-    .filter(s=>s.length>35 && s.length<260);
+    .filter(s=>s.length>25 && s.length<220);
 }
-function keyword(sentence){
-  const stop = new Set('dette denne disse eller også fordi mellom gjennom under over etter før noen mange være blir blitt hadde har som til fra med for ikke det den de en et og av på i er var om kan skal'.split(' '));
-  const words = sentence.toLowerCase().match(/[a-zæøå0-9-]{4,}/g) || [];
-  const candidates = words.filter(w=>!stop.has(w));
-  return candidates.sort((a,b)=>b.length-a.length)[0] || words[0] || 'temaet';
+
+function stripPunctuation(s){
+  return s.replace(/[.!?;:]+$/,'').trim();
 }
-function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+
+function cap(s){
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+function lowerFirst(s){
+  return s.charAt(0).toLowerCase()+s.slice(1);
+}
+
+function usefulPhrase(s){
+  return stripPunctuation(
+    s.replace(/^(det|dette|denne|disse)\s+/i,'')
+     .replace(/\s+/g,' ')
+     .trim()
+  );
+}
+
+function makeNaturalPrompt(sentence, index){
+  const s = usefulPhrase(sentence);
+
+  let m = s.match(/^(.+?)\s+kalles\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva kalles ${lowerFirst(m[1])}?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+er\s+(.+)$/i);
+  if(m && m[1].length < 70 && m[2].length < 100){
+    return {prompt:`Hva er ${lowerFirst(m[1])}?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+består av\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva består ${lowerFirst(m[1])} av?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+trenger\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva trenger ${lowerFirst(m[1])}?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+er avhengig av\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva er ${lowerFirst(m[1])} avhengig av?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+påvirker\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva påvirker ${lowerFirst(m[1])}?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+bruker\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva bruker ${lowerFirst(m[1])}?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+har\s+(.+)$/i);
+  if(m && m[1].length < 70){
+    return {prompt:`Hva har ${lowerFirst(m[1])}?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  m = s.match(/^(.+?)\s+fører til\s+(.+)$/i);
+  if(m){
+    return {prompt:`Hva kan ${lowerFirst(m[1])} føre til?`, answer:cap(stripPunctuation(m[2]))};
+  }
+
+  const words = s.split(/\s+/);
+  const subject = words.slice(0, Math.min(6, words.length)).join(' ');
+  const stems = [
+    `Hva forteller teksten om ${lowerFirst(subject)}?`,
+    `Hva er viktig å vite om ${lowerFirst(subject)}?`,
+    `Hvordan beskrives ${lowerFirst(subject)}?`,
+    `Hva sier teksten om ${lowerFirst(subject)}?`
+  ];
+  return {prompt:stems[index % stems.length], answer:cap(s)};
+}
+
+function answerCandidates(sentences, currentIndex, correct){
+  const candidates = [];
+  for(let i=0;i<sentences.length;i++){
+    if(i===currentIndex) continue;
+    const nat = makeNaturalPrompt(sentences[i], i);
+    let a = stripPunctuation(nat.answer || '');
+    if(a && a.length <= 95 && a.toLowerCase() !== correct.toLowerCase()){
+      candidates.push(cap(a));
+    }
+  }
+  return [...new Set(candidates)];
+}
+
 function makeQuestions(text,type,count){
   const sentences = cleanSentences(text);
   if(sentences.length < 2) throw new Error('Teksten er for kort. Lim inn minst noen avsnitt med fagtekst.');
+
   const qs=[];
-  let si=0;
   for(let i=0;i<count;i++){
-    const s=sentences[si++ % sentences.length];
-    const kw=keyword(s);
+    const sourceIndex=i % sentences.length;
+    const s=sentences[sourceIndex];
+    const natural=makeNaturalPrompt(s, i);
     const useMC = type==='mc' || (type==='both' && i%2===0);
+
     if(useMC){
-      const other = sentences.filter(x=>x!==s).slice(0,3).map(x=>keyword(x)).filter(Boolean);
-      const distractors = [...new Set(other.concat(['temperatur','energi','prosess','miljø']))].filter(x=>x!==kw).slice(0,3);
-      const options=[cap(kw),...distractors.map(cap)].sort(()=>Math.random()-.5);
+      const correct=natural.answer;
+      const distractors=answerCandidates(sentences, sourceIndex, correct).slice(0,3);
+      const fillers=['Ingen av delene','Det varierer','Ikke nevnt i teksten','Alle alternativene'];
+      for(const f of fillers){
+        if(distractors.length>=3) break;
+        if(f.toLowerCase()!==correct.toLowerCase()) distractors.push(f);
+      }
+
+      const options=[correct,...distractors.slice(0,3)].sort(()=>Math.random()-.5);
       qs.push({
         type:'mc',
-        prompt:`Hvilket begrep passer best til denne påstanden: «${s}»`,
+        prompt:natural.prompt,
         options,
-        answer:cap(kw)
+        answer:correct,
+        sourceSentence:s
       });
     }else{
+      const subject = s.split(/\s+/).slice(0,6).join(' ');
+      const textPrompts = [
+        natural.prompt,
+        `Forklar kort med egne ord hva teksten sier om ${lowerFirst(subject)}.`,
+        `Hva vet du om ${lowerFirst(subject)}?`
+      ];
       qs.push({
         type:'text',
-        prompt:`Forklar med egne ord hva denne delen av teksten betyr: «${s}»`,
-        modelAnswer:s
+        prompt:textPrompts[i % textPrompts.length],
+        modelAnswer:s,
+        sourceSentence:s
       });
     }
   }
   return qs;
 }
+
 function codeFromTitle(title){
   const letters=(title.match(/[A-Za-zÆØÅæøå]/g)||['O','P','P']).slice(0,3).join('').toUpperCase();
   return `${letters}-${Math.floor(1000+Math.random()*9000)}`;
@@ -431,7 +534,7 @@ $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.2 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.3 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
