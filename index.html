@@ -3,43 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Spørsmålsgenerator v1.9.3</title>
+  <title>Spørsmålsgenerator v1.9.4</title>
 </head>
 <body>
 <script>
 (async()=>{
   try{
-    const response=await fetch('./app-v1-9-base.html?base=1',{cache:'no-store'});
+    const response=await fetch('./app-v1-9-base.html?base=2',{cache:'no-store'});
     if(!response.ok) throw new Error('Kunne ikke laste grunnfilen.');
     let html=await response.text();
 
-    html=html.replace('<title>Spørsmålsgenerator v1.8</title>','<title>Spørsmålsgenerator v1.9.3</title>');
-    html=html.replace('<div class="version">v1.9</div>','<div class="version">v1.9.3</div>');
+    html=html.replace('<title>Spørsmålsgenerator v1.8</title>','<title>Spørsmålsgenerator v1.9.4</title>');
+    html=html.replace('<div class="version">v1.9</div>','<div class="version">v1.9.4</div>');
 
     const oldCheck=`    if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');\n    const type=$('questionType').value;`;
     const newCheck=`    const type=$('questionType').value;\n    if(!text && type!=='imageDrop' && type!=='drag') return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');`;
     if(html.includes(oldCheck)) html=html.replace(oldCheck,newCheck);
 
-    // Lagre konkrete plasseringer i nye dra-og-slipp-svar.
     html=html.replace(`correctCount,total:q.pairs.length,prompt:q.prompt};`,`correctCount,total:q.pairs.length,prompt:q.prompt,placements};`);
     html=html.replace(`correctCount,total:q.zones.length,prompt:q.prompt};`,`correctCount,total:q.zones.length,prompt:q.prompt,placements};`);
 
-    // Behold den opprinnelige innloggingskoden urørt. Legg bare til funksjoner i svaroversikten.
-    html=html.replace('</style>',`.response-actions{display:flex;gap:8px;flex-wrap:wrap}.answer-box{border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc;margin:8px 0}</style>`);
+    html=html.replace('</style>',`.response-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.response-actions .danger{background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}</style>`);
 
-    // Legg til sletting ved siden av den eksisterende Se-knappen.
-    html=html.replace(
-      `<button class="secondary" onclick="viewResponse(${String.raw`\${idx}`})">Se</button>`,
-      `<div class="response-actions"><button class="secondary" onclick="viewResponse(${String.raw`\${idx}`})">Se besvarelse</button><button class="danger" onclick="deleteResponse(${String.raw`\${idx}`})">Slett</button></div>`
-    );
+    const oldButton='<td><button class="secondary" onclick="viewResponse(${idx})">Se svar</button></td>';
+    const newButton='<td><div class="response-actions"><button class="secondary" onclick="viewResponse(${idx})">Se svar</button><button class="danger" onclick="deleteResponse(${idx})">Slett</button></div></td>';
+    if(!html.includes(oldButton)) throw new Error('Fant ikke Se svar-knappen som skulle utvides.');
+    html=html.replace(oldButton,newButton);
 
-    // Gjør eksisterende detaljvisning tydeligere uten å erstatte resten av appens JavaScript.
-    html=html.replace(
-      `<p><strong>Elevens svar:</strong> ${String.raw`\${escapeHtml(d.answer)}`}</p>`,
-      `<div class="answer-box"><p><strong>Elevens svar:</strong> ${String.raw`\${escapeHtml(d.answer)}`}</p></div>`
-    );
-
-    // Ny slettefunksjon settes inn rett før DOMContentLoaded, slik at lærerinnloggingen beholdes.
     const deleteFn=`\nwindow.deleteResponse=(idx)=>{\n  const rs=store.responses;\n  const r=rs[idx];\n  if(!r) return;\n  if(!confirm('Vil du slette besvarelsen fra '+r.name+' på "'+r.title+'"? Dette kan ikke angres.')) return;\n  rs.splice(idx,1);\n  store.responses=rs;\n  renderResponses();\n};\n\n`;
     html=html.replace("document.addEventListener('DOMContentLoaded'",deleteFn+"document.addEventListener('DOMContentLoaded'");
 
