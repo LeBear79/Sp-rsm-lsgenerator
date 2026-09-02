@@ -1,46 +1,44 @@
 <!doctype html>
 <html lang="no">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spørsmålsgenerator v1.9.6</title></head>
-<body><script>
-(async()=>{try{
-  const response=await fetch('./app-v1-9-base.html?base=4',{cache:'no-store'});if(!response.ok)throw new Error('Kunne ikke laste grunnfilen.');let html=await response.text();
-  html=html.replace('<title>Spørsmålsgenerator v1.8</title>','<title>Spørsmålsgenerator v1.9.6</title>').replace('<div class="version">v1.9</div>','<div class="version">v1.9.6</div>');
-  const oldCheck=`    if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');\n    const type=$('questionType').value;`;
-  const newCheck=`    const type=$('questionType').value;\n    if(!text && type!=='imageDrop' && type!=='drag') return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');`;
-  if(html.includes(oldCheck))html=html.replace(oldCheck,newCheck);
-  html=html.replace(`correctCount,total:q.pairs.length,prompt:q.prompt};`,`correctCount,total:q.pairs.length,prompt:q.prompt,placements};`).replace(`correctCount,total:q.zones.length,prompt:q.prompt};`,`correctCount,total:q.zones.length,prompt:q.prompt,placements};`);
-  html=html.replace('</style>',`.response-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.response-actions .danger{background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}.new-task-row{margin:0 0 16px;padding-bottom:14px;border-bottom:1px solid #e2e8f0}.category-targets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.category-target{min-height:170px}.category-target .placed-card{display:flex;flex-wrap:wrap;gap:7px;align-content:flex-start}.category-target .drag-card{width:auto;min-width:110px;margin:0}.drag-layout.category-mode{grid-template-columns:minmax(220px,.75fr) minmax(440px,1.5fr)}@media(max-width:760px){.drag-layout.category-mode{grid-template-columns:1fr}.category-targets{grid-template-columns:repeat(2,minmax(0,1fr))}}</style>`);
-  const oldButton='<td><button class="secondary" onclick="viewResponse(${idx})">Se svar</button></td>',newButton='<td><div class="response-actions"><button class="secondary" onclick="viewResponse(${idx})">Se svar</button><button class="danger" onclick="deleteResponse(${idx})">Slett</button></div></td>';if(html.includes(oldButton))html=html.replace(oldButton,newButton);
-  const heading='<h2>Lag en oppgave</h2>\n        <p class="muted">Lag og rediger oppgaver. Lærerdelen er beskyttet med PIN-kode.</p>',headingNew='<h2>Lag en oppgave</h2>\n        <div class="new-task-row"><button type="button" class="secondary" id="newTaskBtn">Lag en ny oppgave</button></div>\n        <p class="muted">Lag og rediger oppgaver. Lærerdelen er beskyttet med PIN-kode.</p>';if(html.includes(heading))html=html.replace(heading,headingNew);
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spørsmålsgenerator v1.9.7</title>
+</head>
+<body>
+<script>
+(async()=>{
+  try{
+    const response=await fetch('./app-v1-9-base.html?base=5',{cache:'no-store'});
+    if(!response.ok) throw new Error('Kunne ikke laste grunnfilen.');
+    let html=await response.text();
+    html=html.replace('<title>Spørsmålsgenerator v1.8</title>','<title>Spørsmålsgenerator v1.9.7</title>');
+    html=html.replace('<div class="version">v1.9</div>','<div class="version">v1.9.7</div>');
 
-  const groupedDrag=String.raw`function renderStudentDrag(q,qi){
-  const cards=q.pairs.map(p=>({pairId:p.id,item:p.card,category:(p.target?.kind==='text'?String(p.target.value||'').trim():'')})).sort(()=>Math.random()-.5);
-  const counts={};cards.forEach(c=>{if(c.category)counts[c.category]=(counts[c.category]||0)+1});
-  const categoryMode=Object.values(counts).some(n=>n>1);
-  if(!categoryMode){
-    const targets=q.pairs.map(p=>({pairId:p.id,item:p.target})).sort(()=>Math.random()-.5);setTimeout(()=>initDragQuestion(qi),0);
-    return \`<div class="drag-layout" data-drag-q="\${qi}"><div class="drag-bank"><strong>Kort</strong><div class="drag-bank-inner">\${cards.map(c=>\`<div class="drag-card" draggable="true" data-pair="\${c.pairId}">\${mediaHtml(c.item)}</div>\`).join('')}</div></div><div class="drag-targets"><strong>Plasser her</strong>\${targets.map(t=>\`<div class="drop-target" data-correct="\${t.pairId}"><div>\${mediaHtml(t.item)}</div><div class="placed-card"></div></div>\`).join('')}</div><input type="hidden" name="q\${qi}" value=""></div>\`;
-  }
-  const categories=[...new Set(cards.map(c=>c.category))].sort(()=>Math.random()-.5);setTimeout(()=>initDragQuestion(qi),0);
-  return \`<div class="drag-layout category-mode" data-drag-q="\${qi}" data-category-mode="1"><div class="drag-bank"><strong>Kort</strong><div class="drag-bank-inner">\${cards.map(c=>\`<div class="drag-card" draggable="true" data-pair="\${c.pairId}" data-category="\${escapeHtml(c.category)}">\${mediaHtml(c.item)}</div>\`).join('')}</div></div><div class="drag-targets"><strong>Plasser i riktig kategori</strong><div class="category-targets">\${categories.map(cat=>\`<div class="drop-target category-target" data-category="\${escapeHtml(cat)}"><div><strong>\${escapeHtml(cat)}</strong></div><div class="placed-card"></div></div>\`).join('')}</div></div><input type="hidden" name="q\${qi}" value=""></div>\`;
-}
+    const oldCheck=`    if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');\n    const type=$('questionType').value;`;
+    const newCheck=`    const type=$('questionType').value;\n    if(!text && type!=='imageDrop' && type!=='drag') return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');`;
+    if(html.includes(oldCheck)) html=html.replace(oldCheck,newCheck);
+    html=html.replace(`correctCount,total:q.pairs.length,prompt:q.prompt};`,`correctCount,total:q.pairs.length,prompt:q.prompt,placements};`);
+    html=html.replace(`correctCount,total:q.zones.length,prompt:q.prompt};`,`correctCount,total:q.zones.length,prompt:q.prompt,placements};`);
 
-function initDragQuestion(qi){
-  const wrap=document.querySelector(\`[data-drag-q="\${qi}"]\`);if(!wrap)return;let dragged=null;
-  wrap.querySelectorAll('.drag-card').forEach(card=>card.addEventListener('dragstart',()=>{dragged=card}));
-  wrap.querySelectorAll('.drop-target').forEach(target=>{target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drag-over')});target.addEventListener('dragleave',()=>target.classList.remove('drag-over'));target.addEventListener('drop',e=>{e.preventDefault();target.classList.remove('drag-over');if(!dragged)return;const placed=target.querySelector('.placed-card');if(!wrap.dataset.categoryMode&&placed.firstElementChild)wrap.querySelector('.drag-bank-inner').appendChild(placed.firstElementChild);placed.appendChild(dragged);updateDragAnswer(wrap,qi);dragged=null})});
-  wrap.querySelector('.drag-bank').addEventListener('dragover',e=>e.preventDefault());wrap.querySelector('.drag-bank').addEventListener('drop',e=>{e.preventDefault();if(dragged){wrap.querySelector('.drag-bank-inner').appendChild(dragged);updateDragAnswer(wrap,qi);dragged=null}});
-}
+    html=html.replace('</style>',`.response-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.response-actions .danger{background:#fee2e2;color:#991b1b;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}.new-task-row{margin:0 0 16px;padding-bottom:14px;border-bottom:1px solid #e2e8f0}</style>`);
 
-function updateDragAnswer(wrap,qi){
-  const placements=[];wrap.querySelectorAll('.drop-target').forEach(t=>{t.querySelectorAll('.placed-card .drag-card').forEach(card=>{if(wrap.dataset.categoryMode){placements.push({target:card.dataset.category===t.dataset.category?card.dataset.pair:'wrong',card:card.dataset.pair})}else{placements.push({target:t.dataset.correct,card:card.dataset.pair})}})});wrap.querySelector(\`input[name="q\${qi}"]\`).value=JSON.stringify(placements);
-}
+    const oldButton='<td><button class="secondary" onclick="viewResponse(${idx})">Se svar</button></td>';
+    const newButton='<td><div class="response-actions"><button class="secondary" onclick="viewResponse(${idx})">Se svar</button><button class="danger" onclick="deleteResponse(${idx})">Slett</button></div></td>';
+    if(html.includes(oldButton)) html=html.replace(oldButton,newButton);
 
-`;
-  html=html.replace(/function renderStudentDrag\(q,qi\)\{[\s\S]*?(?=function renderStudentImageDrop)/,groupedDrag);
+    const heading='<h2>Lag en oppgave</h2>\n        <p class="muted">Lag og rediger oppgaver. Lærerdelen er beskyttet med PIN-kode.</p>';
+    const headingNew='<h2>Lag en oppgave</h2>\n        <div class="new-task-row"><button type="button" class="secondary" id="newTaskBtn">Lag en ny oppgave</button></div>\n        <p class="muted">Lag og rediger oppgaver. Lærerdelen er beskyttet med PIN-kode.</p>';
+    if(!html.includes(heading)) throw new Error('Fant ikke området for Lag en oppgave.');
+    html=html.replace(heading,headingNew);
 
-  const extraFns=`\nwindow.deleteResponse=(idx)=>{const rs=store.responses,r=rs[idx];if(!r)return;if(!confirm('Vil du slette besvarelsen fra '+r.name+' på "'+r.title+'"? Dette kan ikke angres.'))return;rs.splice(idx,1);store.responses=rs;renderResponses();};\nfunction startNewTask(){const hasWork=($('taskTitle').value.trim()||$('sourceText').value.trim()||$('webText').value.trim()||$('chatImport').value.trim()||!$('taskCreated').classList.contains('hidden'));if(hasWork&&!confirm('Vil du starte på en ny oppgave? Oppgaver som allerede er lagret i Mine oppgavesett blir ikke slettet.'))return;$('taskTitle').value='';$('sourceText').value='';$('sourceUrl').value='';$('webText').value='';$('chatImport').value='';if($('fetchStatus'))$('fetchStatus').innerHTML='';if($('chatImportStatus'))$('chatImportStatus').innerHTML='';$('questionType').value='both';$('questionCount').value='8';$('difficulty').value='Middels';$('questionCount').disabled=false;$('dragBuilder').classList.add('hidden');$('imageDropBuilder').classList.add('hidden');if(typeof dragPairs!=='undefined')dragPairs=[];if(typeof imageDropZones!=='undefined')imageDropZones=[];if(typeof imageDropWords!=='undefined')imageDropWords=[];if(typeof selectedImageDropWord!=='undefined')selectedImageDropWord='';if($('dragPairs'))$('dragPairs').innerHTML='';if($('imageDropImageData'))$('imageDropImageData').value='';if($('imageDropFile'))$('imageDropFile').value='';if($('imageDropPreview'))$('imageDropPreview').removeAttribute('src');if($('imageDropStageWrap'))$('imageDropStageWrap').classList.add('hidden');if($('imageDropList'))$('imageDropList').innerHTML='';if($('imageDropWordBank'))$('imageDropWordBank').innerHTML='';$('taskCreated').classList.add('hidden');$('taskEmpty').classList.remove('hidden');$('taskCreated').removeAttribute('data-code');$('taskCodeLabel').textContent='';$('taskSummary').textContent='';$('preview').className='muted';$('preview').innerHTML='Spørsmålene vises her.';$('editorButtons').classList.add('hidden');if(typeof sourceMode!=='undefined')sourceMode='text';$('sourceTextBtn').click();window._editingDragCode=null;window._editingDragIndex=null;window._editingImageDropCode=null;window._editingImageDropIndex=null;$('taskTitle').focus();window.scrollTo({top:0,behavior:'smooth'});}\n`;
-  html=html.replace("document.addEventListener('DOMContentLoaded'",extraFns+"document.addEventListener('DOMContentLoaded'");html=html.replace("$('navTeacher').onclick=()=>requireTeacher('teacher');","$('navTeacher').onclick=()=>requireTeacher('teacher');\n$('newTaskBtn').onclick=startNewTask;");
-  document.open();document.write(html);document.close();
-}catch(error){console.error(error);document.body.innerHTML='<main style="font-family:system-ui;padding:24px"><h1>Spørsmålsgenerator</h1><p>Kunne ikke laste appen. Oppdater siden og prøv igjen.</p></main>';}})();
-</script></body></html>
+    const extraFns=`\nwindow.deleteResponse=(idx)=>{\n  const rs=store.responses,r=rs[idx];if(!r)return;\n  if(!confirm('Vil du slette besvarelsen fra '+r.name+' på "'+r.title+'"? Dette kan ikke angres.'))return;\n  rs.splice(idx,1);store.responses=rs;renderResponses();\n};\n\nfunction startNewTask(){\n  const hasWork=($('taskTitle').value.trim()||$('sourceText').value.trim()||$('webText').value.trim()||$('chatImport').value.trim()||!$('taskCreated').classList.contains('hidden'));\n  if(hasWork&&!confirm('Vil du starte på en ny oppgave? Oppgaver som allerede er lagret i Mine oppgavesett blir ikke slettet.'))return;\n  $('taskTitle').value='';$('sourceText').value='';$('sourceUrl').value='';$('webText').value='';$('chatImport').value='';\n  if($('fetchStatus'))$('fetchStatus').innerHTML='';if($('chatImportStatus'))$('chatImportStatus').innerHTML='';\n  $('questionType').value='both';$('questionCount').value='8';$('difficulty').value='Middels';\n  $('questionCount').disabled=false;\n  $('dragBuilder').classList.add('hidden');$('imageDropBuilder').classList.add('hidden');\n  if(typeof dragPairs!=='undefined')dragPairs=[];\n  if(typeof imageDropZones!=='undefined')imageDropZones=[];if(typeof imageDropWords!=='undefined')imageDropWords=[];if(typeof selectedImageDropWord!=='undefined')selectedImageDropWord='';\n  if($('dragPairs'))$('dragPairs').innerHTML='';\n  if($('imageDropImageData'))$('imageDropImageData').value='';if($('imageDropFile'))$('imageDropFile').value='';\n  if($('imageDropPreview'))$('imageDropPreview').removeAttribute('src');if($('imageDropStageWrap'))$('imageDropStageWrap').classList.add('hidden');\n  if($('imageDropList'))$('imageDropList').innerHTML='';if($('imageDropWordBank'))$('imageDropWordBank').innerHTML='';\n  $('taskCreated').classList.add('hidden');$('taskEmpty').classList.remove('hidden');$('taskCreated').removeAttribute('data-code');\n  $('taskCodeLabel').textContent='';$('taskSummary').textContent='';\n  $('preview').className='muted';$('preview').innerHTML='Spørsmålene vises her.';$('editorButtons').classList.add('hidden');\n  if(typeof sourceMode!=='undefined')sourceMode='text';$('sourceTextBtn').click();\n  window._editingDragCode=null;window._editingDragIndex=null;window._editingImageDropCode=null;window._editingImageDropIndex=null;\n  $('taskTitle').focus();window.scrollTo({top:0,behavior:'smooth'});\n}\n\n`;
+    html=html.replace("document.addEventListener('DOMContentLoaded'",extraFns+"document.addEventListener('DOMContentLoaded'");
+    html=html.replace("$('navTeacher').onclick=()=>requireTeacher('teacher');","$('navTeacher').onclick=()=>requireTeacher('teacher');\n$('newTaskBtn').onclick=startNewTask;");
+
+    document.open();document.write(html);document.close();
+  }catch(error){console.error(error);document.body.innerHTML='<main style="font-family:system-ui;padding:24px"><h1>Spørsmålsgenerator</h1><p>Kunne ikke laste appen. Oppdater siden og prøv igjen.</p></main>';}
+})();
+</script>
+</body>
+</html>
