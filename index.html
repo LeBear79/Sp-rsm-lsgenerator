@@ -104,19 +104,26 @@
 
 
     .image-drop-builder{border:1px solid #dbe3ea;border-radius:14px;padding:14px;margin-top:14px;background:#f8fafc}
-    .image-drop-stage{position:relative;display:inline-block;max-width:100%;margin-top:12px}
-    .image-drop-stage img{display:block;max-width:100%;height:auto;border-radius:12px}
-    .drop-marker{position:absolute;transform:translate(-50%,-50%);min-width:72px;min-height:42px;border:2px dashed #64748b;border-radius:10px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;padding:5px;cursor:move}
-    .drop-marker .marker-num{font-weight:700;font-size:.85rem}
+    .image-drop-word-panel{position:sticky;top:8px;z-index:8;margin-top:12px;padding:10px;border:1px solid #cbd5e1;border-radius:12px;background:rgba(248,250,252,.97);box-shadow:0 2px 8px rgba(15,23,42,.06)}
+    .image-drop-word-bank{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
+    .teacher-word-chip{border:1px solid #94a3b8;border-radius:999px;padding:7px 11px;background:#fff;cursor:pointer}
+    .teacher-word-chip.selected{outline:3px solid #93c5fd;background:#eff6ff}
+    .teacher-word-chip.used{opacity:.55}
+    .image-drop-stage{position:relative;display:block;width:100%;max-width:900px;aspect-ratio:4/3;margin-top:12px;overflow:hidden;border-radius:12px;background:#e2e8f0;line-height:0;touch-action:none}
+    .image-drop-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:12px;user-select:none;-webkit-user-drag:none}
+    .drop-marker{position:absolute;transform:translate(-50%,-50%);min-width:0;min-height:0;box-sizing:border-box;border:2px dashed #64748b;border-radius:10px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;padding:5px;cursor:move;line-height:1.1;touch-action:none}
+    .drop-marker .marker-num{font-weight:700;font-size:.85rem;pointer-events:none}
+    .marker-resize{position:absolute;right:-7px;bottom:-7px;width:16px;height:16px;border-radius:50%;background:#334155;border:2px solid #fff;cursor:nwse-resize;touch-action:none}
     .drop-list{display:grid;gap:10px;margin-top:12px}
     .drop-list-item{border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#fff}
-    .student-image-drop{display:grid;gap:14px}
-    .student-image-stage{position:relative;display:inline-block;max-width:100%}
-    .student-image-stage img{display:block;max-width:100%;height:auto;border-radius:12px}
-    .student-drop-zone{position:absolute;transform:translate(-50%,-50%);min-width:82px;min-height:46px;border:2px dashed #64748b;border-radius:10px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;padding:5px;text-align:center}
+    .student-image-drop{display:grid;gap:12px}
+    .student-image-stage{position:relative;display:block;width:100%;max-width:900px;aspect-ratio:4/3;overflow:hidden;border-radius:12px;background:#e2e8f0;line-height:0}
+    .student-image-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:12px;user-select:none;-webkit-user-drag:none}
+    .student-drop-zone{position:absolute;transform:translate(-50%,-50%);min-width:0;min-height:0;box-sizing:border-box;border:2px dashed #64748b;border-radius:10px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;padding:4px;text-align:center;line-height:1.1;overflow:hidden}
     .word-bank{display:flex;flex-wrap:wrap;gap:8px}
     .word-chip{border:1px solid #cbd5e1;border-radius:999px;padding:8px 12px;background:#fff;cursor:grab;user-select:none}
     .word-chip.selected{outline:2px solid #64748b}
+    .student-image-drop .word-bank{position:sticky;bottom:8px;z-index:7;padding:8px;background:rgba(255,255,255,.96);border:1px solid #e2e8f0;border-radius:12px}
     .drop-zone-label{font-size:.8rem;color:#64748b}
     .image-drop-note{font-size:.9rem;color:#64748b}
 
@@ -127,7 +134,7 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.8</div>
+      <div class="version">v1.9</div>
     </div>
     <nav>
       <button id="navStudent" class="active">Elev</button>
@@ -248,7 +255,7 @@ MÅL: Ikke-levende del av et økosystem</div>
 
         <div id="imageDropBuilder" class="image-drop-builder hidden">
           <h3 style="margin-top:0">Dra til bilde</h3>
-          <p class="small muted">Last opp ett bilde. Klikk der du vil ha en tom rute, og skriv inn hvilket ord som hører til akkurat den ruten.</p>
+          <p class="small muted">ChatGPT-ordene er bare forslag. Læreren bestemmer selv hvilke ord som skal brukes, hvor rutene skal ligge og hvilket ord som er riktig i hver rute.</p>
 
           <label for="imageDropInstruction">Instruksjon til eleven</label>
           <input id="imageDropInstruction" value="Dra ordene til riktig plass på bildet." />
@@ -257,11 +264,21 @@ MÅL: Ikke-levende del av et økosystem</div>
           <input id="imageDropFile" type="file" accept="image/*">
           <input id="imageDropImageData" type="hidden">
 
+          <div id="imageDropWordPanel" class="image-drop-word-panel">
+            <strong>Ord som kan plasseres</strong>
+            <div class="small muted">Velg et ord og klikk på bildet for å lage riktig rute. ChatGPT-ord er bare forslag – du kan legge inn dine egne ord.</div>
+            <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px">
+              <div style="flex:1;min-width:180px"><label for="imageDropNewWord">Legg til riktig ord</label><input id="imageDropNewWord" placeholder="F.eks. karbondioksid"></div>
+              <button type="button" id="addImageDropWordBtn" class="secondary">+ Legg til ord</button>
+            </div>
+            <div id="imageDropWordBank" class="image-drop-word-bank"></div>
+          </div>
+
           <div id="imageDropStageWrap" class="hidden">
             <div id="imageDropStage" class="image-drop-stage">
               <img id="imageDropPreview" alt="Bakgrunnsbilde">
             </div>
-            <p class="image-drop-note">Klikk på bildet for å legge til en ny rute. Du kan flytte rutene ved å dra dem.</p>
+            <p class="image-drop-note">Velg et ord over, og klikk på bildet for å plassere ruten. Dra ruten for å flytte den. Dra i prikken nederst til høyre for å endre størrelsen.</p>
           </div>
 
           <div id="imageDropList" class="drop-list"></div>
@@ -748,13 +765,14 @@ function chatPromptText(){
       : type==='drag'
         ? 'Lag dra-og-slipp-oppgaver. Lag tekstpar som kan importeres; bilder kan læreren legge til i appen etterpå.'
         : type==='imageDrop'
-          ? 'Lag et sett med korte fagbegreper som kan plasseres på et bilde. Skriv bare ord/uttrykk som læreren senere kan plassere i tomme ruter på bildet.'
+          ? 'Lag én dra-til-bilde-oppgave. Foreslå 4–8 korte fagbegreper. Ordene er bare forslag; læreren bestemmer senere hvilke ord som brukes og plasserer rutene manuelt på sitt eget bilde.'
           : 'Lag en god blanding av multiple choice og åpne tekstspørsmål.';
 
-  return `Lag nøyaktig ${count} faglige spørsmål for norske ungdomsskoleelever ut fra fagteksten nederst.
+  const requestedCount=type==='imageDrop' ? 1 : count;
+  return `Lag nøyaktig ${requestedCount} faglige spørsmål for norske ungdomsskoleelever ut fra fagteksten nederst.
 
 INNSTILLINGER:
-- Antall spørsmål: ${count}
+- Antall spørsmål: ${requestedCount}
 - Vanskelighetsgrad: ${difficulty}
 - Oppgavetype: ${typeText}
 
@@ -829,6 +847,7 @@ function parseChatQuestions(raw){
 
   const blocks=normalized.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
   const questions=[];
+  const imageDropDrafts=[];
 
   for(const block of blocks){
     const lines=block.split('\n').map(s=>s.trim()).filter(Boolean);
@@ -840,7 +859,7 @@ function parseChatQuestions(raw){
     const isImageDrop=lines.some(l=>/^SVARTYPE\s*:\s*BILDE/i.test(l));
     if(isImageDrop){
       const words=lines.filter(l=>/^ORD\s*:/i.test(l)).map(l=>l.replace(/^ORD\s*:\s*/i,'').trim()).filter(Boolean);
-      if(words.length>=2) questions.push({type:'imageDrop',prompt,image:'',zones:words.map((w,i)=>({id:'z'+Date.now()+'_'+i,x:15+(i%4)*22,y:25+Math.floor(i/4)*25,answer:w}))});
+      if(words.length) imageDropDrafts.push({prompt,words});
       continue;
     }
 
@@ -888,6 +907,14 @@ function parseChatQuestions(raw){
         modelAnswer:''
       });
     }
+  }
+
+  if(imageDropDrafts.length){
+    const allWords=[];
+    imageDropDrafts.forEach(d=>d.words.forEach(w=>{
+      if(!allWords.some(x=>x.toLocaleLowerCase('nb-NO')===w.toLocaleLowerCase('nb-NO'))) allWords.push(w);
+    }));
+    questions.push({type:'imageDrop',prompt:imageDropDrafts[0].prompt||'Dra ordene til riktig plass på bildet.',image:'',words:allWords,zones:[]});
   }
 
   if(!questions.length){
@@ -1025,99 +1052,120 @@ $('questionType').addEventListener('change',()=>{
 
 
 let imageDropZones=[];
+let imageDropWords=[];
+let selectedImageDropWord='';
+
+function uniqueImageWords(words){
+  const out=[];
+  (words||[]).forEach(w=>{
+    w=String(w||'').trim();
+    if(w && !out.some(x=>x.toLocaleLowerCase('nb-NO')===w.toLocaleLowerCase('nb-NO'))) out.push(w);
+  });
+  return out;
+}
+
+function sizeImageStage(stage,img,maxWidth=900,maxHeightRatio=.52){
+  if(!stage||!img) return;
+  const apply=()=>{
+    if(!img.naturalWidth||!img.naturalHeight) return;
+    const ratio=img.naturalWidth/img.naturalHeight;
+    const maxHeight=Math.max(320,Math.min(600,window.innerHeight*maxHeightRatio));
+    const fittedWidth=Math.min(maxWidth,maxHeight*ratio);
+    stage.style.maxWidth=Math.max(260,fittedWidth)+'px';
+    stage.style.aspectRatio=`${img.naturalWidth} / ${img.naturalHeight}`;
+  };
+  if(img.complete) apply(); else img.addEventListener('load',apply,{once:true});
+  apply();
+}
+
+function renderImageDropWordBank(){
+  const panel=$('imageDropWordPanel');
+  const bank=$('imageDropWordBank');
+  panel.classList.remove('hidden');
+  if(!imageDropWords.length){ bank.innerHTML='<span class="small muted">Ingen ord lagt inn ennå.</span>'; return; }
+  const used=new Set(imageDropZones.map(z=>String(z.answer||'').toLocaleLowerCase('nb-NO')));
+  bank.innerHTML=imageDropWords.map(w=>`<button type="button" class="teacher-word-chip ${selectedImageDropWord===w?'selected':''} ${used.has(w.toLocaleLowerCase('nb-NO'))?'used':''}" data-word="${escapeHtml(w)}">${escapeHtml(w)}</button>`).join('');
+  bank.querySelectorAll('.teacher-word-chip').forEach(btn=>{btn.onclick=()=>{selectedImageDropWord=btn.dataset.word;renderImageDropWordBank();};});
+}
+
+function addTeacherImageWord(){
+  const input=$('imageDropNewWord');
+  const word=input.value.trim();
+  if(!word) return;
+  imageDropWords=uniqueImageWords([...imageDropWords,word]);
+  selectedImageDropWord=word;
+  input.value='';
+  renderImageDropWordBank();
+}
+$('addImageDropWordBtn').addEventListener('click',addTeacherImageWord);
+$('imageDropNewWord').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addTeacherImageWord();}});
+
+function defaultZoneSize(){ return {w:16,h:9}; }
+function normalizeImageZone(z){
+  const d=defaultZoneSize();
+  return {...z,x:Number.isFinite(Number(z.x))?Number(z.x):50,y:Number.isFinite(Number(z.y))?Number(z.y):50,w:Number.isFinite(Number(z.w))?Number(z.w):d.w,h:Number.isFinite(Number(z.h))?Number(z.h):d.h,answer:String(z.answer||'')};
+}
 
 function renderImageDropZones(){
   const stage=$('imageDropStage');
   stage.querySelectorAll('.drop-marker').forEach(el=>el.remove());
+  imageDropZones=imageDropZones.map(normalizeImageZone);
   imageDropZones.forEach((z,i)=>{
     const marker=document.createElement('div');
     marker.className='drop-marker';
-    marker.style.left=z.x+'%';
-    marker.style.top=z.y+'%';
+    Object.assign(marker.style,{left:z.x+'%',top:z.y+'%',width:z.w+'%',height:z.h+'%'});
     marker.dataset.id=z.id;
-    marker.innerHTML=`<span class="marker-num">${i+1}</span>`;
+    marker.innerHTML=`<span class="marker-num">${i+1}</span><span class="marker-resize" title="Endre størrelse"></span>`;
     let dragging=false;
-    marker.addEventListener('pointerdown',e=>{
-      dragging=true;
-      marker.setPointerCapture(e.pointerId);
-    });
-    marker.addEventListener('pointermove',e=>{
-      if(!dragging) return;
-      const r=stage.getBoundingClientRect();
-      z.x=Math.max(2,Math.min(98,((e.clientX-r.left)/r.width)*100));
-      z.y=Math.max(2,Math.min(98,((e.clientY-r.top)/r.height)*100));
-      marker.style.left=z.x+'%';
-      marker.style.top=z.y+'%';
-    });
-    marker.addEventListener('pointerup',e=>{dragging=false;marker.releasePointerCapture(e.pointerId);});
+    marker.addEventListener('pointerdown',e=>{if(e.target.classList.contains('marker-resize')) return;e.preventDefault();dragging=true;marker.setPointerCapture(e.pointerId);});
+    marker.addEventListener('pointermove',e=>{if(!dragging)return;const r=stage.getBoundingClientRect();const hw=z.w/2,hh=z.h/2;z.x=Math.max(hw,Math.min(100-hw,((e.clientX-r.left)/r.width)*100));z.y=Math.max(hh,Math.min(100-hh,((e.clientY-r.top)/r.height)*100));marker.style.left=z.x+'%';marker.style.top=z.y+'%';});
+    const stop=e=>{if(!dragging)return;dragging=false;try{marker.releasePointerCapture(e.pointerId)}catch(_){}};
+    marker.addEventListener('pointerup',stop);marker.addEventListener('pointercancel',stop);
+    const handle=marker.querySelector('.marker-resize');
+    let resizing=false;
+    handle.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();resizing=true;handle.setPointerCapture(e.pointerId);});
+    handle.addEventListener('pointermove',e=>{if(!resizing)return;const r=stage.getBoundingClientRect();const right=((e.clientX-r.left)/r.width)*100,bottom=((e.clientY-r.top)/r.height)*100;z.w=Math.max(7,Math.min(45,(right-z.x)*2));z.h=Math.max(5,Math.min(30,(bottom-z.y)*2));z.x=Math.max(z.w/2,Math.min(100-z.w/2,z.x));z.y=Math.max(z.h/2,Math.min(100-z.h/2,z.y));Object.assign(marker.style,{width:z.w+'%',height:z.h+'%',left:z.x+'%',top:z.y+'%'});});
+    const stopResize=e=>{if(!resizing)return;resizing=false;try{handle.releasePointerCapture(e.pointerId)}catch(_){}};
+    handle.addEventListener('pointerup',stopResize);handle.addEventListener('pointercancel',stopResize);
     stage.appendChild(marker);
   });
 
-  $('imageDropList').innerHTML=imageDropZones.map((z,i)=>`
-    <div class="drop-list-item">
-      <label>Rute ${i+1} – riktig ord</label>
-      <input class="image-drop-answer" data-id="${z.id}" value="${escapeHtml(z.answer||'')}" placeholder="F.eks. Karbondioksid">
-      <div class="drag-actions">
-        <button type="button" class="danger removeImageZoneBtn" data-id="${z.id}">Fjern rute</button>
-      </div>
-    </div>`).join('');
-
-  document.querySelectorAll('.image-drop-answer').forEach(inp=>{
-    inp.addEventListener('input',()=>{
-      const z=imageDropZones.find(x=>x.id===inp.dataset.id);
-      if(z) z.answer=inp.value;
-    });
-  });
-  document.querySelectorAll('.removeImageZoneBtn').forEach(btn=>{
-    btn.onclick=()=>{
-      imageDropZones=imageDropZones.filter(z=>z.id!==btn.dataset.id);
-      renderImageDropZones();
-    };
-  });
+  $('imageDropList').innerHTML=imageDropZones.map((z,i)=>{
+    const options=uniqueImageWords([...imageDropWords,z.answer]).map(w=>`<option value="${escapeHtml(w)}" ${w===z.answer?'selected':''}>${escapeHtml(w)}</option>`).join('');
+    return `<div class="drop-list-item"><label>Rute ${i+1} – riktig ord</label><select class="image-drop-answer" data-id="${z.id}"><option value="">Velg ord</option>${options}</select><div class="drag-actions"><button type="button" class="danger removeImageZoneBtn" data-id="${z.id}">Fjern rute</button></div></div>`;
+  }).join('');
+  document.querySelectorAll('.image-drop-answer').forEach(inp=>{inp.addEventListener('change',()=>{const z=imageDropZones.find(x=>x.id===inp.dataset.id);if(z)z.answer=inp.value;renderImageDropWordBank();});});
+  document.querySelectorAll('.removeImageZoneBtn').forEach(btn=>{btn.onclick=()=>{imageDropZones=imageDropZones.filter(z=>z.id!==btn.dataset.id);renderImageDropZones();renderImageDropWordBank();};});
+  renderImageDropWordBank();
 }
 
 $('imageDropFile').addEventListener('change',async()=>{
-  const file=$('imageDropFile').files?.[0];
-  if(!file) return;
-  const data=await compressImage(file);
-  $('imageDropImageData').value=data;
-  $('imageDropPreview').src=data;
-  $('imageDropStageWrap').classList.remove('hidden');
+  const file=$('imageDropFile').files?.[0]; if(!file)return;
+  const data=await compressImage(file); $('imageDropImageData').value=data; $('imageDropPreview').src=data; $('imageDropStageWrap').classList.remove('hidden'); sizeImageStage($('imageDropStage'),$('imageDropPreview'));
 });
 
 $('imageDropStage').addEventListener('click',e=>{
-  if(e.target.classList.contains('drop-marker') || e.target.closest('.drop-marker')) return;
-  const r=$('imageDropStage').getBoundingClientRect();
-  const x=((e.clientX-r.left)/r.width)*100;
-  const y=((e.clientY-r.top)/r.height)*100;
-  imageDropZones.push({id:'z'+Date.now()+'_'+Math.random().toString(36).slice(2,6),x,y,answer:''});
-  renderImageDropZones();
+  if(e.target.classList.contains('drop-marker')||e.target.closest('.drop-marker'))return;
+  if(!selectedImageDropWord){const unused=imageDropWords.find(w=>!imageDropZones.some(z=>String(z.answer||'').toLocaleLowerCase('nb-NO')===w.toLocaleLowerCase('nb-NO')));selectedImageDropWord=unused||imageDropWords[0]||'';}
+  if(!selectedImageDropWord){alert('Legg inn minst ett riktig ord først.');return;}
+  const r=$('imageDropStage').getBoundingClientRect(),d=defaultZoneSize();
+  const x=Math.max(d.w/2,Math.min(100-d.w/2,((e.clientX-r.left)/r.width)*100)),y=Math.max(d.h/2,Math.min(100-d.h/2,((e.clientY-r.top)/r.height)*100));
+  imageDropZones.push({id:'z'+Date.now()+'_'+Math.random().toString(36).slice(2,6),x,y,w:d.w,h:d.h,answer:selectedImageDropWord});selectedImageDropWord='';renderImageDropZones();
 });
 
 function loadImageDropBuilder(q=null){
-  imageDropZones=(q?.zones||[]).map(z=>({...z}));
-  $('imageDropInstruction').value=q?.prompt||'Dra ordene til riktig plass på bildet.';
-  $('imageDropImageData').value=q?.image||'';
-  if(q?.image){
-    $('imageDropPreview').src=q.image;
-    $('imageDropStageWrap').classList.remove('hidden');
-  }else{
-    $('imageDropStageWrap').classList.add('hidden');
-  }
-  renderImageDropZones();
+  imageDropZones=(q?.zones||[]).map(normalizeImageZone);
+  imageDropWords=uniqueImageWords(q?.words?.length?q.words:imageDropZones.map(z=>z.answer));selectedImageDropWord='';
+  $('imageDropInstruction').value=q?.prompt||'Dra ordene til riktig plass på bildet.';$('imageDropImageData').value=q?.image||'';
+  if(q?.image){$('imageDropPreview').src=q.image;$('imageDropStageWrap').classList.remove('hidden');sizeImageStage($('imageDropStage'),$('imageDropPreview'));}else{$('imageDropStageWrap').classList.add('hidden');}
+  renderImageDropZones();renderImageDropWordBank();
 }
 
 function readImageDropQuestion(){
-  const image=$('imageDropImageData').value;
-  if(!image) throw new Error('Legg inn et bakgrunnsbilde først.');
-  const zones=imageDropZones.map(z=>({...z,answer:String(z.answer||'').trim()})).filter(z=>z.answer);
-  if(zones.length<2) throw new Error('Lag minst to ruter med riktige svar.');
-  return {
-    type:'imageDrop',
-    prompt:$('imageDropInstruction').value.trim()||'Dra ordene til riktig plass på bildet.',
-    image,
-    zones
-  };
+  const image=$('imageDropImageData').value;if(!image)throw new Error('Legg inn et bakgrunnsbilde først.');
+  const zones=imageDropZones.map(normalizeImageZone).map(z=>({...z,answer:String(z.answer||'').trim()})).filter(z=>z.answer);
+  if(zones.length<2)throw new Error('Plasser minst to ruter og velg riktig ord for hver rute.');
+  return {type:'imageDrop',prompt:$('imageDropInstruction').value.trim()||'Dra ordene til riktig plass på bildet.',image,words:uniqueImageWords(imageDropWords),zones};
 }
 
 function makeQuestions(text,type,count){
@@ -1192,7 +1240,7 @@ function renderPreview(task){
              </div>`
           : q.type==='imageDrop'
             ? `<div class="editbox">
-                 <p class="small muted">Dra til bilde med ${q.zones.length} ruter.</p>
+                 <p class="small muted">${q.image && q.zones.length ? `Dra til bilde med ${q.zones.length} ruter.` : `Dra til bilde er ikke ferdig satt opp. ${q.words?.length||0} ord er importert som forslag.`}</p>
                  <button type="button" class="secondary editImageDropQuestionBtn" data-index="${i}">Rediger dra til bilde</button>
                </div>`
             : `<div class="editbox">
@@ -1301,7 +1349,7 @@ $('saveEditsBtn').onclick=()=>{
       if(window._editingImageDropTaskCode===code && window._editingImageDropQuestionIndex===i){
         try{
           const updated=readImageDropQuestion();
-          q.prompt=updated.prompt; q.image=updated.image; q.zones=updated.zones;
+          q.prompt=updated.prompt; q.image=updated.image; q.words=updated.words; q.zones=updated.zones;
         }catch(err){}
       }
     }else{
@@ -1404,21 +1452,12 @@ function updateDragAnswer(wrap,qi){
 
 
 function renderStudentImageDrop(q,qi){
+  if(!q.image || !Array.isArray(q.zones) || !q.zones.length){return `<div class="warnbox">Denne dra-til-bilde-oppgaven er ikke ferdig satt opp av læreren ennå.</div><input type="hidden" name="q${qi}" value="">`;}
   const words=q.zones.map(z=>z.answer).sort(()=>Math.random()-.5);
-  setTimeout(()=>initStudentImageDrop(qi),0);
+  setTimeout(()=>{initStudentImageDrop(qi);const wrap=document.querySelector(`[data-image-drop-q="${qi}"]`);if(wrap)sizeImageStage(wrap.querySelector('.student-image-stage'),wrap.querySelector('.student-image-stage img'),900,.60);},0);
   return `<div class="student-image-drop" data-image-drop-q="${qi}">
-    <div class="student-image-stage">
-      <img src="${q.image}" alt="Oppgavebilde">
-      ${q.zones.map(z=>`<div class="student-drop-zone" data-zone="${z.id}" data-correct="${escapeHtml(z.answer)}" style="left:${z.x}%;top:${z.y}%">
-        <span class="drop-zone-label">Slipp her</span>
-      </div>`).join('')}
-    </div>
-    <div>
-      <strong>Ord</strong>
-      <div class="word-bank">
-        ${words.map((w,i)=>`<button type="button" class="word-chip" data-word="${escapeHtml(w)}">${escapeHtml(w)}</button>`).join('')}
-      </div>
-    </div>
+    <div><strong>Ord</strong><div class="word-bank">${words.map(w=>`<button type="button" class="word-chip" data-word="${escapeHtml(w)}">${escapeHtml(w)}</button>`).join('')}</div></div>
+    <div class="student-image-stage"><img src="${q.image}" alt="Oppgavebilde">${q.zones.map(raw=>{const z=normalizeImageZone(raw);return `<div class="student-drop-zone" data-zone="${z.id}" data-correct="${escapeHtml(z.answer)}" style="left:${z.x}%;top:${z.y}%;width:${z.w}%;height:${z.h}%"><span class="drop-zone-label">Slipp her</span></div>`}).join('')}</div>
     <input type="hidden" name="q${qi}" value="">
   </div>`;
 }
@@ -1707,6 +1746,11 @@ window.saveFeedback=(ri,di)=>{
 
 document.addEventListener('DOMContentLoaded',()=>{
   if(['drag','imageDrop'].includes($('questionType').value)) $('questionType').dispatchEvent(new Event('change'));
+});
+
+window.addEventListener('resize',()=>{
+  if(!$('imageDropStageWrap').classList.contains('hidden')) sizeImageStage($('imageDropStage'),$('imageDropPreview'));
+  document.querySelectorAll('.student-image-stage').forEach(stage=>{const img=stage.querySelector('img');if(img)sizeImageStage(stage,img,900,.60);});
 });
 </script>
 </body>
