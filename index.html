@@ -1,16 +1,11 @@
 <!doctype html>
 <html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spørsmålsgenerator v1.9.9</title></head><body><script>
 (async()=>{try{
-const response=await fetch('./index-v1-9-8-backup.html',{cache:'no-store'});
-if(!response.ok){
-  const r=await fetch('./app-v1-9-base.html?base=7',{cache:'no-store'});if(!r.ok)throw new Error('Kunne ikke laste grunnfilen.');
-  let base=await r.text();
-  // Fallback: redirect to previous stable wrapper is handled below only if backup exists.
-  throw new Error('Mangler v1.9.8-backup.');
-}
+const response=await fetch('https://raw.githubusercontent.com/LeBear79/Sp-rsm-lsgenerator/8246d770325ff19e149e6d30e642a1e11b440506/index.html',{cache:'no-store'});
+if(!response.ok)throw new Error('Kunne ikke laste forrige stabile versjon.');
 let html=await response.text();
 html=html.replaceAll('v1.9.8','v1.9.9');
-// Når en arkivert dra-og-slipp-oppgave åpnes, må den markeres som aktiv redigering.
+// Fiks: arkivert dra-og-slipp-oppgave skal være i redigeringsmodus med én gang den åpnes.
 html=html.replace("if(dragQ) loadDragBuilder(dragQ);",`if(dragQ){
     loadDragBuilder(dragQ);
     window._editingDragTaskCode=task.code;
