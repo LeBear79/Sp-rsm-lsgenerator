@@ -17,7 +17,7 @@
         html = html
           .replace('<title>Spørsmålsgenerator v1.8</title>', '<title>Spørsmålsgenerator v1.9</title>')
           .replace('<div class="version">v1.8</div>', '<div class="version">v1.9</div>')
-          .replace('</body>', '<script src="v1.9-patch.js"><\\/script></body>');
+          .replace('</body>', '<script src="v1.9-patch.js"></' + 'script></body>');
         document.open();
         document.write(html);
         document.close();
