@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Spørsmålsgenerator v1.6</title>
+  <title>Spørsmålsgenerator v1.8</title>
   <meta name="theme-color" content="#0f172a" />
   <style>
     :root{
@@ -84,6 +84,42 @@
     .archive-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
     .archive-toolbar > div{flex:1;min-width:180px}
     
+
+    .drag-builder{border:1px solid #dbe3ea;border-radius:14px;padding:14px;margin-top:14px;background:#f8fafc}
+    .drag-pair-row{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+    .drag-pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .drag-side{border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+    .drag-side h4{margin:0 0 8px}
+    .drag-img-preview{max-width:150px;max-height:110px;border-radius:8px;margin-top:8px;display:block}
+    .drag-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .drag-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .drag-bank,.drag-targets{border:2px dashed #cbd5e1;border-radius:14px;padding:12px;min-height:120px;background:#f8fafc}
+    .drag-card{display:flex;align-items:center;gap:8px;border:1px solid #cbd5e1;border-radius:10px;padding:9px;background:#fff;margin:7px 0;cursor:grab;user-select:none}
+    .drag-card img,.drop-target img{max-width:150px;max-height:100px;border-radius:8px}
+    .drop-target{border:2px dashed #94a3b8;border-radius:12px;padding:10px;margin:8px 0;min-height:72px;background:#fff}
+    .drop-target.drag-over{border-style:solid;background:#f1f5f9}
+    .placed-card{margin-top:8px}
+    .drag-score{font-weight:700}
+    @media(max-width:760px){.drag-pair-grid,.drag-layout{grid-template-columns:1fr}}
+
+
+    .image-drop-builder{border:1px solid #dbe3ea;border-radius:14px;padding:14px;margin-top:14px;background:#f8fafc}
+    .image-drop-stage{position:relative;display:inline-block;max-width:100%;margin-top:12px}
+    .image-drop-stage img{display:block;max-width:100%;height:auto;border-radius:12px}
+    .drop-marker{position:absolute;transform:translate(-50%,-50%);min-width:72px;min-height:42px;border:2px dashed #64748b;border-radius:10px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;padding:5px;cursor:move}
+    .drop-marker .marker-num{font-weight:700;font-size:.85rem}
+    .drop-list{display:grid;gap:10px;margin-top:12px}
+    .drop-list-item{border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#fff}
+    .student-image-drop{display:grid;gap:14px}
+    .student-image-stage{position:relative;display:inline-block;max-width:100%}
+    .student-image-stage img{display:block;max-width:100%;height:auto;border-radius:12px}
+    .student-drop-zone{position:absolute;transform:translate(-50%,-50%);min-width:82px;min-height:46px;border:2px dashed #64748b;border-radius:10px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;padding:5px;text-align:center}
+    .word-bank{display:flex;flex-wrap:wrap;gap:8px}
+    .word-chip{border:1px solid #cbd5e1;border-radius:999px;padding:8px 12px;background:#fff;cursor:grab;user-select:none}
+    .word-chip.selected{outline:2px solid #64748b}
+    .drop-zone-label{font-size:.8rem;color:#64748b}
+    .image-drop-note{font-size:.9rem;color:#64748b}
+
 </style>
 </head>
 <body>
@@ -91,7 +127,7 @@
   <div class="wrap">
     <div>
       <h1>Spørsmålsgenerator</h1>
-      <div class="version">v1.6</div>
+      <div class="version">v1.8</div>
     </div>
     <nav>
       <button id="navStudent" class="active">Elev</button>
@@ -161,7 +197,14 @@ RIKTIG: A
 
 SPØRSMÅL: Hvorfor trenger hoggormen varme?
 SVARTYPE: TEKST
-FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
+FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.
+
+SPØRSMÅL: Dra begrepene til riktig forklaring.
+SVARTYPE: DRA
+KORT: Biotisk faktor
+MÅL: Levende del av et økosystem
+KORT: Abiotisk faktor
+MÅL: Ikke-levende del av et økosystem</div>
           </details>
         </div>
 
@@ -172,6 +215,8 @@ FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
               <option value="mc">Multiple choice</option>
               <option value="text">Tekstsvar</option>
               <option value="both" selected>Begge deler</option>
+              <option value="drag">Dra og slipp</option>
+              <option value="imageDrop">Dra til bilde</option>
             </select>
           </div>
           <div>
@@ -188,6 +233,38 @@ FASIT: Fordi den er vekselvarm og er avhengig av varme fra omgivelsene.</div>
               <option>Vanskelig</option>
             </select>
           </div>
+        </div>
+
+        <div id="dragBuilder" class="drag-builder hidden">
+          <h3 style="margin-top:0">Dra og slipp</h3>
+          <p class="small muted">Lag par som hører sammen. Både kortet eleven drar og målområdet kan være tekst eller bilde.</p>
+          <label for="dragInstruction">Instruksjon til eleven</label>
+          <input id="dragInstruction" value="Dra hvert kort til riktig plass." />
+          <div id="dragPairs"></div>
+          <button type="button" id="addDragPairBtn" class="secondary">+ Legg til par</button>
+          <p class="small muted" style="margin-top:10px">Bildene blir komprimert før de lagres lokalt. Bruk helst noen få bilder per oppgavesett.</p>
+        
+        </div>
+
+        <div id="imageDropBuilder" class="image-drop-builder hidden">
+          <h3 style="margin-top:0">Dra til bilde</h3>
+          <p class="small muted">Last opp ett bilde. Klikk der du vil ha en tom rute, og skriv inn hvilket ord som hører til akkurat den ruten.</p>
+
+          <label for="imageDropInstruction">Instruksjon til eleven</label>
+          <input id="imageDropInstruction" value="Dra ordene til riktig plass på bildet." />
+
+          <label for="imageDropFile" style="margin-top:10px">Bakgrunnsbilde</label>
+          <input id="imageDropFile" type="file" accept="image/*">
+          <input id="imageDropImageData" type="hidden">
+
+          <div id="imageDropStageWrap" class="hidden">
+            <div id="imageDropStage" class="image-drop-stage">
+              <img id="imageDropPreview" alt="Bakgrunnsbilde">
+            </div>
+            <p class="image-drop-note">Klikk på bildet for å legge til en ny rute. Du kan flytte rutene ved å dra dem.</p>
+          </div>
+
+          <div id="imageDropList" class="drop-list"></div>
         </div>
 
         <div style="margin-top:16px">
@@ -668,7 +745,11 @@ function chatPromptText(){
     ? 'Lag bare multiple choice-spørsmål.'
     : type==='text'
       ? 'Lag bare åpne tekstspørsmål.'
-      : 'Lag en god blanding av multiple choice og åpne tekstspørsmål.';
+      : type==='drag'
+        ? 'Lag dra-og-slipp-oppgaver. Lag tekstpar som kan importeres; bilder kan læreren legge til i appen etterpå.'
+        : type==='imageDrop'
+          ? 'Lag et sett med korte fagbegreper som kan plasseres på et bilde. Skriv bare ord/uttrykk som læreren senere kan plassere i tomme ruter på bildet.'
+          : 'Lag en god blanding av multiple choice og åpne tekstspørsmål.';
 
   return `Lag nøyaktig ${count} faglige spørsmål for norske ungdomsskoleelever ut fra fagteksten nederst.
 
@@ -693,6 +774,17 @@ For multiple choice:
 For åpne spørsmål:
 - Lag et kort forslag til fasit/lærergrunnlag.
 
+For dra og slipp:
+- Lag tydelige par der KORT hører sammen med MÅL.
+- Kort og mål skal være faglig entydige.
+- Lag minst 3 par i hver dra-og-slipp-oppgave.
+- Bruk tekst i ChatGPT-formatet. Bilder kan legges til manuelt i appen etter import.
+
+For dra til bilde:
+- Lag 4–8 korte ord eller begreper som kan plasseres på et illustrasjonsbilde.
+- Hvert svar skal være kort og entydig.
+- Læreren plasserer rutene manuelt på bildet i appen.
+
 SVAR NØYAKTIG I DETTE FORMATET:
 
 SPØRSMÅL: [spørsmålet]
@@ -706,6 +798,24 @@ For åpne spørsmål:
 SPØRSMÅL: [spørsmålet]
 SVARTYPE: TEKST
 FASIT: [kort fasit]
+
+For dra og slipp:
+SPØRSMÅL: [instruksjon]
+SVARTYPE: DRA
+KORT: [tekst]
+MÅL: [tekst]
+KORT: [tekst]
+MÅL: [tekst]
+KORT: [tekst]
+MÅL: [tekst]
+
+For dra til bilde:
+SPØRSMÅL: [instruksjon]
+SVARTYPE: BILDE
+ORD: [ord 1]
+ORD: [ord 2]
+ORD: [ord 3]
+ORD: [ord 4]
 
 Ikke bruk nummerering, tabeller eller ekstra forklaringer utenfor dette formatet.
 
@@ -726,6 +836,29 @@ function parseChatQuestions(raw){
     if(!qLine) continue;
     const prompt=qLine.replace(/^SPØRSMÅL\s*:\s*/i,'').trim();
     if(!prompt) continue;
+
+    const isImageDrop=lines.some(l=>/^SVARTYPE\s*:\s*BILDE/i.test(l));
+    if(isImageDrop){
+      const words=lines.filter(l=>/^ORD\s*:/i.test(l)).map(l=>l.replace(/^ORD\s*:\s*/i,'').trim()).filter(Boolean);
+      if(words.length>=2) questions.push({type:'imageDrop',prompt,image:'',zones:words.map((w,i)=>({id:'z'+Date.now()+'_'+i,x:15+(i%4)*22,y:25+Math.floor(i/4)*25,answer:w}))});
+      continue;
+    }
+
+    const isDrag=lines.some(l=>/^SVARTYPE\s*:\s*DRA/i.test(l));
+    if(isDrag){
+      const cards=lines.filter(l=>/^KORT\s*:/i.test(l)).map(l=>l.replace(/^KORT\s*:\s*/i,'').trim());
+      const targets=lines.filter(l=>/^MÅL\s*:/i.test(l)).map(l=>l.replace(/^MÅL\s*:\s*/i,'').trim());
+      const pairs=[];
+      for(let i=0;i<Math.min(cards.length,targets.length);i++){
+        if(cards[i] && targets[i]) pairs.push({
+          id:'p'+Date.now()+'_'+i,
+          card:{kind:'text',value:cards[i]},
+          target:{kind:'text',value:targets[i]}
+        });
+      }
+      if(pairs.length>=2) questions.push({type:'drag',prompt,pairs});
+      continue;
+    }
 
     const isText=lines.some(l=>/^SVARTYPE\s*:\s*TEKST/i.test(l));
     if(isText){
@@ -761,6 +894,230 @@ function parseChatQuestions(raw){
     throw new Error('Jeg fant ingen spørsmål i riktig format. Bruk «Kopier instruksjon til ChatGPT» og lim inn svaret på nytt.');
   }
   return questions;
+}
+
+
+let dragPairCounter=0;
+
+function dragSideHtml(side,label){
+  return `<div class="drag-side">
+    <h4>${label}</h4>
+    <label>Type</label>
+    <select class="drag-kind" data-side="${side}">
+      <option value="text">Tekst</option>
+      <option value="image">Bilde</option>
+    </select>
+    <div class="drag-text-wrap">
+      <label>Tekst</label>
+      <input class="drag-text" data-side="${side}" placeholder="${side==='card'?'F.eks. Sol':'F.eks. Abiotisk faktor'}">
+    </div>
+    <div class="drag-image-wrap hidden">
+      <label>Velg bilde</label>
+      <input type="file" class="drag-image" data-side="${side}" accept="image/*">
+      <img class="drag-img-preview hidden" alt="Forhåndsvisning">
+      <input type="hidden" class="drag-image-data" data-side="${side}">
+    </div>
+  </div>`;
+}
+
+function addDragPair(data=null){
+  dragPairCounter++;
+  const row=document.createElement('div');
+  row.className='drag-pair-row';
+  row.dataset.pair=dragPairCounter;
+  row.innerHTML=`
+    <div class="pair-label"><strong>Par ${document.querySelectorAll('.drag-pair-row').length+1}</strong></div>
+    <div class="drag-pair-grid">
+      ${dragSideHtml('card','Kort som skal dras')}
+      ${dragSideHtml('target','Riktig mål')}
+    </div>
+    <div class="drag-actions"><button type="button" class="danger removeDragPairBtn">Fjern par</button></div>`;
+  $('dragPairs').appendChild(row);
+
+  row.querySelectorAll('.drag-kind').forEach(sel=>{
+    sel.onchange=()=>{
+      const box=sel.closest('.drag-side');
+      box.querySelector('.drag-text-wrap').classList.toggle('hidden',sel.value!=='text');
+      box.querySelector('.drag-image-wrap').classList.toggle('hidden',sel.value!=='image');
+    };
+  });
+  row.querySelectorAll('.drag-image').forEach(inp=>{
+    inp.onchange=async()=>{
+      const file=inp.files?.[0];
+      if(!file) return;
+      try{
+        const dataUrl=await compressImage(file);
+        const box=inp.closest('.drag-side');
+        box.querySelector('.drag-image-data').value=dataUrl;
+        const img=box.querySelector('.drag-img-preview');
+        img.src=dataUrl; img.classList.remove('hidden');
+      }catch(e){ alert('Kunne ikke lese bildet. Prøv et annet bilde.'); }
+    };
+  });
+  row.querySelector('.removeDragPairBtn').onclick=()=>row.remove();
+
+  if(data){
+    for(const side of ['card','target']){
+      const d=data[side]||{};
+      const box=row.querySelector(`.drag-side select[data-side="${side}"]`).closest('.drag-side');
+      const kind=box.querySelector('.drag-kind');
+      kind.value=d.kind||'text';
+      kind.dispatchEvent(new Event('change'));
+      if(kind.value==='text') box.querySelector('.drag-text').value=d.value||'';
+      else if(d.value){
+        box.querySelector('.drag-image-data').value=d.value;
+        const img=box.querySelector('.drag-img-preview');
+        img.src=d.value; img.classList.remove('hidden');
+      }
+    }
+  }
+}
+
+async function compressImage(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((resolve,reject)=>{
+      const im=new Image(); im.onload=()=>resolve(im); im.onerror=reject; im.src=url;
+    });
+    const max=900;
+    let w=img.naturalWidth,h=img.naturalHeight;
+    const scale=Math.min(1,max/Math.max(w,h));
+    w=Math.round(w*scale); h=Math.round(h*scale);
+    const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    return canvas.toDataURL('image/jpeg',0.75);
+  }finally{ URL.revokeObjectURL(url); }
+}
+
+function readDragPairs(){
+  const pairs=[];
+  document.querySelectorAll('.drag-pair-row').forEach((row,i)=>{
+    const pair={id:'p'+Date.now()+'_'+i};
+    for(const side of ['card','target']){
+      const box=row.querySelector(`.drag-kind[data-side="${side}"]`).closest('.drag-side');
+      const kind=box.querySelector('.drag-kind').value;
+      const value=kind==='text' ? box.querySelector('.drag-text').value.trim() : box.querySelector('.drag-image-data').value;
+      pair[side]={kind,value};
+    }
+    if(pair.card.value && pair.target.value) pairs.push(pair);
+  });
+  return pairs;
+}
+
+function loadDragBuilder(question){
+  $('dragPairs').innerHTML='';
+  $('dragInstruction').value=question?.prompt||'Dra hvert kort til riktig plass.';
+  (question?.pairs||[]).forEach(p=>addDragPair(p));
+  if(!(question?.pairs||[]).length){addDragPair();addDragPair();addDragPair();}
+}
+
+$('addDragPairBtn').onclick=()=>addDragPair();
+$('questionType').addEventListener('change',()=>{
+  const val=$('questionType').value;
+  const isDrag=val==='drag';
+  const isImageDrop=val==='imageDrop';
+  $('dragBuilder').classList.toggle('hidden',!isDrag);
+  $('imageDropBuilder').classList.toggle('hidden',!isImageDrop);
+  $('questionCount').disabled=isDrag||isImageDrop;
+  if(isDrag && !$('dragPairs').children.length) loadDragBuilder();
+  if(isImageDrop && !imageDropZones.length) loadImageDropBuilder();
+});
+
+
+let imageDropZones=[];
+
+function renderImageDropZones(){
+  const stage=$('imageDropStage');
+  stage.querySelectorAll('.drop-marker').forEach(el=>el.remove());
+  imageDropZones.forEach((z,i)=>{
+    const marker=document.createElement('div');
+    marker.className='drop-marker';
+    marker.style.left=z.x+'%';
+    marker.style.top=z.y+'%';
+    marker.dataset.id=z.id;
+    marker.innerHTML=`<span class="marker-num">${i+1}</span>`;
+    let dragging=false;
+    marker.addEventListener('pointerdown',e=>{
+      dragging=true;
+      marker.setPointerCapture(e.pointerId);
+    });
+    marker.addEventListener('pointermove',e=>{
+      if(!dragging) return;
+      const r=stage.getBoundingClientRect();
+      z.x=Math.max(2,Math.min(98,((e.clientX-r.left)/r.width)*100));
+      z.y=Math.max(2,Math.min(98,((e.clientY-r.top)/r.height)*100));
+      marker.style.left=z.x+'%';
+      marker.style.top=z.y+'%';
+    });
+    marker.addEventListener('pointerup',e=>{dragging=false;marker.releasePointerCapture(e.pointerId);});
+    stage.appendChild(marker);
+  });
+
+  $('imageDropList').innerHTML=imageDropZones.map((z,i)=>`
+    <div class="drop-list-item">
+      <label>Rute ${i+1} – riktig ord</label>
+      <input class="image-drop-answer" data-id="${z.id}" value="${escapeHtml(z.answer||'')}" placeholder="F.eks. Karbondioksid">
+      <div class="drag-actions">
+        <button type="button" class="danger removeImageZoneBtn" data-id="${z.id}">Fjern rute</button>
+      </div>
+    </div>`).join('');
+
+  document.querySelectorAll('.image-drop-answer').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const z=imageDropZones.find(x=>x.id===inp.dataset.id);
+      if(z) z.answer=inp.value;
+    });
+  });
+  document.querySelectorAll('.removeImageZoneBtn').forEach(btn=>{
+    btn.onclick=()=>{
+      imageDropZones=imageDropZones.filter(z=>z.id!==btn.dataset.id);
+      renderImageDropZones();
+    };
+  });
+}
+
+$('imageDropFile').addEventListener('change',async()=>{
+  const file=$('imageDropFile').files?.[0];
+  if(!file) return;
+  const data=await compressImage(file);
+  $('imageDropImageData').value=data;
+  $('imageDropPreview').src=data;
+  $('imageDropStageWrap').classList.remove('hidden');
+});
+
+$('imageDropStage').addEventListener('click',e=>{
+  if(e.target.classList.contains('drop-marker') || e.target.closest('.drop-marker')) return;
+  const r=$('imageDropStage').getBoundingClientRect();
+  const x=((e.clientX-r.left)/r.width)*100;
+  const y=((e.clientY-r.top)/r.height)*100;
+  imageDropZones.push({id:'z'+Date.now()+'_'+Math.random().toString(36).slice(2,6),x,y,answer:''});
+  renderImageDropZones();
+});
+
+function loadImageDropBuilder(q=null){
+  imageDropZones=(q?.zones||[]).map(z=>({...z}));
+  $('imageDropInstruction').value=q?.prompt||'Dra ordene til riktig plass på bildet.';
+  $('imageDropImageData').value=q?.image||'';
+  if(q?.image){
+    $('imageDropPreview').src=q.image;
+    $('imageDropStageWrap').classList.remove('hidden');
+  }else{
+    $('imageDropStageWrap').classList.add('hidden');
+  }
+  renderImageDropZones();
+}
+
+function readImageDropQuestion(){
+  const image=$('imageDropImageData').value;
+  if(!image) throw new Error('Legg inn et bakgrunnsbilde først.');
+  const zones=imageDropZones.map(z=>({...z,answer:String(z.answer||'').trim()})).filter(z=>z.answer);
+  if(zones.length<2) throw new Error('Lag minst to ruter med riktige svar.');
+  return {
+    type:'imageDrop',
+    prompt:$('imageDropInstruction').value.trim()||'Dra ordene til riktig plass på bildet.',
+    image,
+    zones
+  };
 }
 
 function makeQuestions(text,type,count){
@@ -828,14 +1185,48 @@ function renderPreview(task){
                  <input type="radio" name="correct_${i}" data-q="${i}" data-o="${oi}" ${o===q.answer?'checked':''} title="Riktig svar">
                </div>`).join('')}
            </div>`
-        : `<div class="editbox">
+        : q.type==='drag'
+          ? `<div class="editbox">
+               <p class="small muted">Dra-og-slipp med ${q.pairs.length} par. Bruk «Rediger dra og slipp» for å endre tekst eller bilder.</p>
+               <button type="button" class="secondary editDragQuestionBtn" data-index="${i}">Rediger dra og slipp</button>
+             </div>`
+          : q.type==='imageDrop'
+            ? `<div class="editbox">
+                 <p class="small muted">Dra til bilde med ${q.zones.length} ruter.</p>
+                 <button type="button" class="secondary editImageDropQuestionBtn" data-index="${i}">Rediger dra til bilde</button>
+               </div>`
+            : `<div class="editbox">
              <label>Forslag til fasit / lærergrunnlag</label>
              <textarea class="editModelAnswer" data-index="${i}" style="min-height:90px">${escapeHtml(q.modelAnswer||'')}</textarea>
            </div>`
       }
-      <div class="small muted">Type: ${q.type==='mc'?'Multiple choice':'Tekstsvar'}</div>
+      <div class="small muted">Type: ${q.type==='mc'?'Multiple choice':q.type==='drag'?'Dra og slipp':q.type==='imageDrop'?'Dra til bilde':'Tekstsvar'}</div>
     </div>`).join('');
   $('editorButtons').classList.remove('hidden');
+  document.querySelectorAll('.editDragQuestionBtn').forEach(btn=>{
+    btn.onclick=()=>{
+      const q=task.questions[Number(btn.dataset.index)];
+      $('questionType').value='drag';
+      $('questionType').dispatchEvent(new Event('change'));
+      loadDragBuilder(q);
+      window._editingDragQuestionIndex=Number(btn.dataset.index);
+      window._editingDragTaskCode=task.code;
+      showView('teacher');
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+  });
+  document.querySelectorAll('.editImageDropQuestionBtn').forEach(btn=>{
+    btn.onclick=()=>{
+      const q=task.questions[Number(btn.dataset.index)];
+      $('questionType').value='imageDrop';
+      $('questionType').dispatchEvent(new Event('change'));
+      loadImageDropBuilder(q);
+      window._editingImageDropQuestionIndex=Number(btn.dataset.index);
+      window._editingImageDropTaskCode=task.code;
+      showView('teacher');
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+  });
 }
 $('generateBtn').onclick=()=>{
   try{
@@ -843,9 +1234,22 @@ $('generateBtn').onclick=()=>{
     const text=(sourceMode==='text' ? $('sourceText').value : $('webText').value).trim();
     if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');
     const type=$('questionType').value;
-    const count=Number($('questionCount').value);
     const difficulty=$('difficulty').value;
-    const questions=makeQuestions(text,type,count);
+    let questions, count;
+    if(type==='drag'){
+      const pairs=readDragPairs();
+      if(pairs.length<2) return alert('Lag minst to komplette par i dra-og-slipp-oppgaven.');
+      questions=[{type:'drag',prompt:$('dragInstruction').value.trim()||'Dra hvert kort til riktig plass.',pairs}];
+      count=1;
+    }else if(type==='imageDrop'){
+      try{
+        questions=[readImageDropQuestion()];
+      }catch(err){ return alert(err.message); }
+      count=1;
+    }else{
+      count=Number($('questionCount').value);
+      questions=makeQuestions(text,type,count);
+    }
     const code=codeFromTitle(title);
     const task={
       code,title,text,type,count,difficulty,questions,
@@ -885,6 +1289,21 @@ $('saveEditsBtn').onclick=()=>{
       }else if(q.options.length){
         q.answer=q.options[0];
       }
+    }else if(q.type==='drag'){
+      if(window._editingDragTaskCode===code && window._editingDragQuestionIndex===i){
+        const pairs=readDragPairs();
+        if(pairs.length>=2){
+          q.prompt=$('dragInstruction').value.trim()||q.prompt;
+          q.pairs=pairs;
+        }
+      }
+    }else if(q.type==='imageDrop'){
+      if(window._editingImageDropTaskCode===code && window._editingImageDropQuestionIndex===i){
+        try{
+          const updated=readImageDropQuestion();
+          q.prompt=updated.prompt; q.image=updated.image; q.zones=updated.zones;
+        }catch(err){}
+      }
     }else{
       const modelEl=document.querySelector(`.editModelAnswer[data-index="${i}"]`);
       if(modelEl) q.modelAnswer=modelEl.value.trim();
@@ -915,12 +1334,152 @@ $('deleteTaskBtn').onclick=()=>{
   $('taskCreated').classList.add('hidden'); $('taskEmpty').classList.remove('hidden'); $('preview').innerHTML='<span class="muted">Spørsmålene vises her.</span>'; $('editorButtons').classList.add('hidden');
 };
 
+
+function mediaHtml(item){
+  if(!item) return '';
+  return item.kind==='image'
+    ? `<img src="${item.value}" alt="Bilde">`
+    : `<span>${escapeHtml(item.value)}</span>`;
+}
+
+function renderStudentDrag(q,qi){
+  const cards=q.pairs.map(p=>({pairId:p.id,item:p.card})).sort(()=>Math.random()-.5);
+  const targets=q.pairs.map(p=>({pairId:p.id,item:p.target})).sort(()=>Math.random()-.5);
+  setTimeout(()=>initDragQuestion(qi),0);
+  return `<div class="drag-layout" data-drag-q="${qi}">
+    <div class="drag-bank">
+      <strong>Kort</strong>
+      <div class="drag-bank-inner">
+        ${cards.map(c=>`<div class="drag-card" draggable="true" data-pair="${c.pairId}">${mediaHtml(c.item)}</div>`).join('')}
+      </div>
+    </div>
+    <div class="drag-targets">
+      <strong>Plasser her</strong>
+      ${targets.map(t=>`<div class="drop-target" data-correct="${t.pairId}">
+          <div>${mediaHtml(t.item)}</div>
+          <div class="placed-card"></div>
+        </div>`).join('')}
+    </div>
+    <input type="hidden" name="q${qi}" value="">
+  </div>`;
+}
+
+function initDragQuestion(qi){
+  const wrap=document.querySelector(`[data-drag-q="${qi}"]`);
+  if(!wrap) return;
+  let dragged=null;
+  wrap.querySelectorAll('.drag-card').forEach(card=>{
+    card.addEventListener('dragstart',()=>{dragged=card;});
+  });
+  wrap.querySelectorAll('.drop-target').forEach(target=>{
+    target.addEventListener('dragover',e=>{e.preventDefault();target.classList.add('drag-over');});
+    target.addEventListener('dragleave',()=>target.classList.remove('drag-over'));
+    target.addEventListener('drop',e=>{
+      e.preventDefault(); target.classList.remove('drag-over');
+      if(!dragged) return;
+      const placed=target.querySelector('.placed-card');
+      if(placed.firstElementChild){
+        wrap.querySelector('.drag-bank-inner').appendChild(placed.firstElementChild);
+      }
+      placed.appendChild(dragged);
+      updateDragAnswer(wrap,qi);
+      dragged=null;
+    });
+  });
+  wrap.querySelector('.drag-bank').addEventListener('dragover',e=>e.preventDefault());
+  wrap.querySelector('.drag-bank').addEventListener('drop',e=>{
+    e.preventDefault();
+    if(dragged){wrap.querySelector('.drag-bank-inner').appendChild(dragged);updateDragAnswer(wrap,qi);dragged=null;}
+  });
+}
+
+function updateDragAnswer(wrap,qi){
+  const placements=[];
+  wrap.querySelectorAll('.drop-target').forEach(t=>{
+    const card=t.querySelector('.placed-card .drag-card');
+    if(card) placements.push({target:t.dataset.correct,card:card.dataset.pair});
+  });
+  wrap.querySelector(`input[name="q${qi}"]`).value=JSON.stringify(placements);
+}
+
+
+function renderStudentImageDrop(q,qi){
+  const words=q.zones.map(z=>z.answer).sort(()=>Math.random()-.5);
+  setTimeout(()=>initStudentImageDrop(qi),0);
+  return `<div class="student-image-drop" data-image-drop-q="${qi}">
+    <div class="student-image-stage">
+      <img src="${q.image}" alt="Oppgavebilde">
+      ${q.zones.map(z=>`<div class="student-drop-zone" data-zone="${z.id}" data-correct="${escapeHtml(z.answer)}" style="left:${z.x}%;top:${z.y}%">
+        <span class="drop-zone-label">Slipp her</span>
+      </div>`).join('')}
+    </div>
+    <div>
+      <strong>Ord</strong>
+      <div class="word-bank">
+        ${words.map((w,i)=>`<button type="button" class="word-chip" data-word="${escapeHtml(w)}">${escapeHtml(w)}</button>`).join('')}
+      </div>
+    </div>
+    <input type="hidden" name="q${qi}" value="">
+  </div>`;
+}
+
+function initStudentImageDrop(qi){
+  const wrap=document.querySelector(`[data-image-drop-q="${qi}"]`);
+  if(!wrap) return;
+  let selected=null;
+
+  function update(){
+    const placements=[];
+    wrap.querySelectorAll('.student-drop-zone').forEach(z=>{
+      const chip=z.querySelector('.word-chip');
+      if(chip) placements.push({zone:z.dataset.zone,word:chip.dataset.word});
+    });
+    wrap.querySelector(`input[name="q${qi}"]`).value=JSON.stringify(placements);
+  }
+
+  function bindChip(chip){
+    chip.addEventListener('click',()=>{
+      wrap.querySelectorAll('.word-chip').forEach(c=>c.classList.remove('selected'));
+      selected=chip;
+      chip.classList.add('selected');
+    });
+    chip.draggable=true;
+    chip.addEventListener('dragstart',()=>selected=chip);
+  }
+
+  wrap.querySelectorAll('.word-chip').forEach(bindChip);
+  wrap.querySelectorAll('.student-drop-zone').forEach(zone=>{
+    zone.addEventListener('dragover',e=>e.preventDefault());
+    zone.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(!selected) return;
+      const existing=zone.querySelector('.word-chip');
+      if(existing) wrap.querySelector('.word-bank').appendChild(existing);
+      zone.innerHTML='';
+      zone.appendChild(selected);
+      selected.classList.remove('selected');
+      selected=null;
+      update();
+    });
+    zone.addEventListener('click',()=>{
+      if(!selected) return;
+      const existing=zone.querySelector('.word-chip');
+      if(existing) wrap.querySelector('.word-bank').appendChild(existing);
+      zone.innerHTML='';
+      zone.appendChild(selected);
+      selected.classList.remove('selected');
+      selected=null;
+      update();
+    });
+  });
+}
+
 let currentTask=null;
 $('openTaskBtn').onclick=()=>{
   const name=$('studentName').value.trim(), code=$('studentCode').value.trim().toUpperCase();
   if(!name||!code){$('studentMessage').innerHTML='<div class="warnbox">Skriv navn og oppgavekode.</div>'; return}
   const task=store.tasks[code];
-  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.6 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
+  if(!task){$('studentMessage').innerHTML='<div class="warnbox">Fant ikke oppgaven på denne enheten. I v1.8 må oppgaven være laget på samme enhet. Firebase-versjonen vil fungere på tvers av enheter.</div>'; return}
   currentTask=task;
   $('studentTaskCard').classList.remove('hidden'); $('studentResult').classList.add('hidden');
   $('studentTaskTitle').textContent=task.title;
@@ -929,8 +1488,12 @@ $('openTaskBtn').onclick=()=>{
     <div class="q">
       <h4>${i+1}. ${q.prompt}</h4>
       ${q.type==='mc'
-        ? q.options.map(o=>`<label class="option"><input type="radio" name="q${i}" value="${o.replace(/"/g,'&quot;')}"> ${o}</label>`).join('')
-        : `<textarea name="q${i}" placeholder="Skriv svaret ditt"></textarea>`
+        ? q.options.map(o=>`<label class="option"><input type="radio" name="q${i}" value="${escapeHtml(o)}"> ${escapeHtml(o)}</label>`).join('')
+        : q.type==='drag'
+          ? renderStudentDrag(q,i)
+          : q.type==='imageDrop'
+            ? renderStudentImageDrop(q,i)
+            : `<textarea name="q${i}" placeholder="Skriv svaret ditt"></textarea>`
       }
     </div>`).join('');
   $('studentMessage').innerHTML='';
@@ -940,16 +1503,36 @@ $('submitBtn').onclick=(ev)=>{
   if(!currentTask) return;
   const fd=new FormData($('studentForm'));
   const answers=currentTask.questions.map((q,i)=>fd.get('q'+i)||'');
-  if(answers.some(a=>!String(a).trim())){alert('Svar på alle spørsmål før du leverer.');return}
-  let mcTotal=0, mcCorrect=0;
+  if(answers.some(a=>!String(a).trim())){alert('Svar på alle spørsmål før du leverer. Dra alle kortene til et mål.');return}
+  let mcTotal=0, mcCorrect=0, dragTotal=0, dragCorrect=0;
   const details=currentTask.questions.map((q,i)=>{
-    if(q.type==='mc'){mcTotal++; const ok=answers[i]===q.answer; if(ok)mcCorrect++; return {type:'mc',answer:answers[i],correct:ok,correctAnswer:q.answer,prompt:q.prompt}}
+    if(q.type==='mc'){
+      mcTotal++; const ok=answers[i]===q.answer; if(ok)mcCorrect++;
+      return {type:'mc',answer:answers[i],correct:ok,correctAnswer:q.answer,prompt:q.prompt};
+    }
+    if(q.type==='drag'){
+      let placements=[]; try{placements=JSON.parse(answers[i]||'[]')}catch(e){}
+      if(placements.length!==q.pairs.length) throw new Error('Alle dra-og-slipp-kort må plasseres.');
+      const correctCount=placements.filter(p=>p.target===p.card).length;
+      dragTotal+=q.pairs.length; dragCorrect+=correctCount;
+      return {type:'drag',answer:`${correctCount}/${q.pairs.length} riktige plasseringer`,correct:correctCount===q.pairs.length,
+        correctCount,total:q.pairs.length,prompt:q.prompt};
+    }
+    if(q.type==='imageDrop'){
+      let placements=[]; try{placements=JSON.parse(answers[i]||'[]')}catch(e){}
+      if(placements.length!==q.zones.length) throw new Error('Alle ordene må plasseres på bildet.');
+      const zoneMap=Object.fromEntries(q.zones.map(z=>[z.id,z.answer]));
+      const correctCount=placements.filter(p=>zoneMap[p.zone]===p.word).length;
+      dragTotal+=q.zones.length; dragCorrect+=correctCount;
+      return {type:'imageDrop',answer:`${correctCount}/${q.zones.length} riktige plasseringer`,correct:correctCount===q.zones.length,
+        correctCount,total:q.zones.length,prompt:q.prompt};
+    }
     return {type:'text',answer:answers[i],prompt:q.prompt,teacherFeedback:'',status:'Til vurdering'};
   });
   const response={
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
     code:currentTask.code,title:currentTask.title,name:$('studentName').value.trim(),
-    submitted:new Date().toISOString(),mcTotal,mcCorrect,details
+    submitted:new Date().toISOString(),mcTotal,mcCorrect,dragTotal,dragCorrect,details
   };
   const rs=store.responses; rs.push(response); store.responses=rs;
   $('studentTaskCard').classList.add('hidden');
@@ -958,7 +1541,8 @@ $('submitBtn').onclick=(ev)=>{
     <h2>Levert</h2>
     <p>Takk, ${response.name}. Besvarelsen er registrert.</p>
     ${mcTotal?`<p class="score">Multiple choice: ${mcCorrect} av ${mcTotal} riktige</p>`:''}
-    <p class="muted">Tekstsvar må vurderes av lærer.</p>`;
+    ${dragTotal?`<p class="score">Dra og slipp: ${dragCorrect} av ${dragTotal} riktige</p>`:''}
+    <p class="muted">${currentTask.questions.some(q=>q.type==='text')?'Tekstsvar må vurderes av lærer.':'Oppgaven er automatisk rettet.'}</p>`;
 };
 
 
@@ -1022,6 +1606,12 @@ window.openArchivedTask=(code)=>{
   $('taskTitle').value=task.title||'';
   $('questionCount').value=String(task.count||task.questions?.length||8);
   $('difficulty').value=task.difficulty||'Middels';
+  $('questionType').value=task.type||'both';
+  $('questionType').dispatchEvent(new Event('change'));
+  const dragQ=task.questions?.find(q=>q.type==='drag');
+  if(dragQ) loadDragBuilder(dragQ);
+  const imageDropQ=task.questions?.find(q=>q.type==='imageDrop');
+  if(imageDropQ) loadImageDropBuilder(imageDropQ);
 
   if(task.sourceMode==='web'){
     sourceMode='web';
@@ -1072,12 +1662,13 @@ function renderResponses(){
   if(!rs.length){$('responsesTable').innerHTML='<p class="muted">Ingen besvarelser ennå.</p>';return}
   $('responsesTable').innerHTML=`
     <table>
-      <thead><tr><th>Elev</th><th>Oppgave</th><th>MC</th><th>Levert</th><th></th></tr></thead>
+      <thead><tr><th>Elev</th><th>Oppgave</th><th>MC</th><th>Dra/slipp</th><th>Levert</th><th></th></tr></thead>
       <tbody>${rs.map((r,idx)=>`
         <tr>
           <td>${escapeHtml(r.name)}</td>
           <td>${escapeHtml(r.title)}<br><span class="small muted">${r.code}</span></td>
           <td>${r.mcTotal?`${r.mcCorrect}/${r.mcTotal}`:'–'}</td>
+          <td>${r.dragTotal?`${r.dragCorrect}/${r.dragTotal}`:'–'}</td>
           <td>${new Date(r.submitted).toLocaleString('no-NO')}</td>
           <td><button class="secondary" onclick="viewResponse(${idx})">Se svar</button></td>
         </tr>`).join('')}
@@ -1097,7 +1688,9 @@ window.viewResponse=(idx)=>{
           <p><strong>Svar:</strong> ${escapeHtml(d.answer)}</p>
           ${d.type==='mc'
             ? `<p class="${d.correct?'pill ok':'pill warn'}">${d.correct?'Riktig':'Feil'}${d.correct?'':` · Fasit: ${escapeHtml(d.correctAnswer)}`}</p>`
-            : `<label>Tilbakemelding fra lærer</label>
+            : (d.type==='drag'||d.type==='imageDrop')
+              ? `<p class="${d.correct?'pill ok':'pill warn'}">${d.correct?'Alt riktig':`${d.correctCount}/${d.total} riktige plasseringer`}</p>`
+              : `<label>Tilbakemelding fra lærer</label>
                <textarea id="fb_${idx}_${i}" placeholder="Skriv tilbakemelding...">${escapeHtml(d.teacherFeedback||'')}</textarea>
                <button class="secondary" onclick="saveFeedback(${idx},${i})">Lagre tilbakemelding</button>`
           }
@@ -1111,6 +1704,10 @@ window.saveFeedback=(ri,di)=>{
   store.responses=rs;
   alert('Tilbakemeldingen er lagret.');
 };
+
+document.addEventListener('DOMContentLoaded',()=>{
+  if(['drag','imageDrop'].includes($('questionType').value)) $('questionType').dispatchEvent(new Event('change'));
+});
 </script>
 </body>
 </html>
