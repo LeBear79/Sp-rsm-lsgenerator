@@ -1,21 +1,21 @@
 <!doctype html>
-<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spørsmålsgenerator v1.9.9</title></head><body><script>
+<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spørsmålsgenerator v1.9.10</title></head><body><script>
 (async()=>{try{
-const response=await fetch('https://raw.githubusercontent.com/LeBear79/Sp-rsm-lsgenerator/8246d770325ff19e149e6d30e642a1e11b440506/index.html',{cache:'no-store'});
-if(!response.ok)throw new Error('Kunne ikke laste forrige stabile versjon.');
-let html=await response.text();
-html=html.replaceAll('v1.9.8','v1.9.9');
-// Fiks: arkivert dra-og-slipp-oppgave skal være i redigeringsmodus med én gang den åpnes.
-html=html.replace("if(dragQ) loadDragBuilder(dragQ);",`if(dragQ){
-    loadDragBuilder(dragQ);
-    window._editingDragTaskCode=task.code;
-    window._editingDragQuestionIndex=task.questions.findIndex(q=>q.type==='drag');
-  }`);
-html=html.replace("if(imageDropQ) loadImageDropBuilder(imageDropQ);",`if(imageDropQ){
-    loadImageDropBuilder(imageDropQ);
-    window._editingImageDropTaskCode=task.code;
-    window._editingImageDropQuestionIndex=task.questions.findIndex(q=>q.type==='imageDrop');
-  }`);
-document.open();document.write(html);document.close();
-}catch(error){console.error(error);document.body.innerHTML='<main style="font-family:system-ui;padding:24px"><h1>Spørsmålsgenerator</h1><p>Kunne ikke laste appen. Oppdater siden og prøv igjen.</p></main>';}})();
+  const response=await fetch('https://raw.githubusercontent.com/LeBear79/Sp-rsm-lsgenerator/8246d770325ff19e149e6d30e642a1e11b440506/index.html',{cache:'no-store'});
+  if(!response.ok) throw new Error('Kunne ikke laste stabil grunnversjon.');
+  let html=await response.text();
+  html=html.replaceAll('v1.9.8','v1.9.10');
+
+  // Legg inn en egen rettelse etter at hele appen er lastet.
+  // Da endrer vi ikke lærerinnloggingen eller resten av hovedkoden.
+  const oldWrite='document.open();document.write(html);document.close();';
+  const newWrite=`html=html.replace('</body>','<script src="./fix-v1-9-10.js"></'+'script></body>');document.open();document.write(html);document.close();`;
+  if(!html.includes(oldWrite)) throw new Error('Fant ikke innlastingspunktet i grunnversjonen.');
+  html=html.replace(oldWrite,newWrite);
+
+  document.open();document.write(html);document.close();
+}catch(error){
+  console.error(error);
+  document.body.innerHTML='<main style="font-family:system-ui;padding:24px"><h1>Spørsmålsgenerator</h1><p>Kunne ikke laste appen. Oppdater siden og prøv igjen.</p></main>';
+}})();
 </script></body></html>
