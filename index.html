@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Spørsmålsgenerator v1.9.1</title>
+  <title>Spørsmålsgenerator v1.9.2</title>
 </head>
 <body>
 <script>
@@ -13,18 +13,123 @@
     if(!response.ok) throw new Error('Kunne ikke laste grunnfilen.');
     let html=await response.text();
 
-    html=html.replace('<title>Spørsmålsgenerator v1.8</title>','<title>Spørsmålsgenerator v1.9.1</title>');
-    html=html.replace('<div class="version">v1.9</div>','<div class="version">v1.9.1</div>');
+    html=html.replace('<title>Spørsmålsgenerator v1.8</title>','<title>Spørsmålsgenerator v1.9.2</title>');
+    html=html.replace('<div class="version">v1.9</div>','<div class="version">v1.9.2</div>');
 
-    const oldCheck=`    if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');
-    const type=$('questionType').value;`;
-    const newCheck=`    const type=$('questionType').value;
-    // Manuelt bygde oppgaver trenger ikke fagtekst. Fagtekst er bare påkrevd
-    // når spørsmål faktisk skal genereres fra kildeteksten.
-    if(!text && type!=='imageDrop' && type!=='drag') return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');`;
+    const oldCheck=`    if(!text) return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');\n    const type=$('questionType').value;`;
+    const newCheck=`    const type=$('questionType').value;\n    // Manuelt bygde oppgaver trenger ikke fagtekst. Fagtekst er bare påkrevd\n    // når spørsmål faktisk skal genereres fra kildeteksten.\n    if(!text && type!=='imageDrop' && type!=='drag') return alert(sourceMode==='web' ? 'Hent eller lim inn tekst fra nettsiden først.' : 'Lim inn en fagtekst først.');`;
+    if(html.includes(oldCheck)) html=html.replace(oldCheck,newCheck);
 
-    if(!html.includes(oldCheck)) throw new Error('Fant ikke valideringen som skulle rettes.');
-    html=html.replace(oldCheck,newCheck);
+    // Fra v1.9.2 lagres de konkrete plasseringene i nye dra-og-slipp-besvarelser.
+    html=html.replace(
+      `correctCount,total:q.pairs.length,prompt:q.prompt};`,
+      `correctCount,total:q.pairs.length,prompt:q.prompt,placements};`
+    );
+    html=html.replace(
+      `correctCount,total:q.zones.length,prompt:q.prompt};`,
+      `correctCount,total:q.zones.length,prompt:q.prompt,placements};`
+    );
+
+    // Litt ekstra styling til detaljvisningen.
+    html=html.replace('</style>',`
+      .response-actions{display:flex;gap:8px;flex-wrap:wrap}
+      .response-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+      .answer-box{border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc;margin:8px 0}
+      .answer-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #e2e8f0}
+      .answer-row:last-child{border-bottom:0}
+      .answer-media img{max-width:110px;max-height:80px;border-radius:8px}
+      @media(max-width:700px){.answer-row{grid-template-columns:1fr}}
+    </style>`);
+
+    const responsePatch=String.raw`
+function renderResponses(){
+  const rs=store.responses;
+  if(!rs.length){$('responsesTable').innerHTML='<p class="muted">Ingen besvarelser ennå.</p>';return}
+  $('responsesTable').innerHTML=\`
+    <table>
+      <thead><tr><th>Elev</th><th>Oppgave</th><th>MC</th><th>Dra/slipp</th><th>Levert</th><th></th></tr></thead>
+      <tbody>\${rs.map((r,idx)=>\`
+        <tr>
+          <td>\${escapeHtml(r.name)}</td>
+          <td>\${escapeHtml(r.title)}<br><span class="small muted">\${escapeHtml(r.code)}</span></td>
+          <td>\${r.mcTotal?\`\${r.mcCorrect}/\${r.mcTotal}\`:'–'}</td>
+          <td>\${r.dragTotal?\`\${r.dragCorrect}/\${r.dragTotal}\`:'–'}</td>
+          <td>\${new Date(r.submitted).toLocaleString('no-NO')}</td>
+          <td><div class="response-actions">
+            <button class="secondary" onclick="viewResponse(\${idx})">Se besvarelse</button>
+            <button class="danger" onclick="deleteResponse(\${idx})">Slett</button>
+          </div></td>
+        </tr>\`).join('')}
+      </tbody>
+    </table>
+    <div id="responseDetail" style="margin-top:18px"></div>\`;
+}
+
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+function responseMedia(item){
+  if(!item) return '<span class="muted">Ukjent</span>';
+  if(item.kind==='image') return \`<span class="answer-media"><img src="\${item.value}" alt="Bilde"></span>\`;
+  return \`<span>\${escapeHtml(item.value)}</span>\`;
+}
+
+function dragDetailHtml(d,question){
+  if(!Array.isArray(d.placements) || !question){
+    return \`<div class="answer-box"><p><strong>Resultat:</strong> \${escapeHtml(d.answer)}</p><p class="small muted">Denne besvarelsen ble levert før detaljert lagring av dra-og-slipp-svar ble lagt til. Derfor kan de enkelte plasseringene ikke vises.</p></div>\`;
+  }
+  if(d.type==='drag'){
+    const pairById=Object.fromEntries((question.pairs||[]).map(p=>[p.id,p]));
+    return \`<div class="answer-box"><strong>Elevens plasseringer</strong>\${d.placements.map(p=>{
+      const targetPair=pairById[p.target], cardPair=pairById[p.card], ok=p.target===p.card;
+      return \`<div class="answer-row"><div><span class="small muted">Mål:</span><br>\${responseMedia(targetPair?.target)}</div><div><span class="small muted">Eleven plasserte:</span><br>\${responseMedia(cardPair?.card)}</div><div><span class="\${ok?'pill ok':'pill warn'}">\${ok?'Riktig':'Feil'}</span></div></div>\`;
+    }).join('')}</div>\`;
+  }
+  if(d.type==='imageDrop'){
+    const zoneById=Object.fromEntries((question.zones||[]).map(z=>[z.id,z]));
+    return \`<div class="answer-box">\${question.image?\`<img src="\${question.image}" alt="Oppgavebilde" style="max-width:100%;max-height:360px;border-radius:10px;margin-bottom:10px">\`:''}<strong>Elevens plasseringer</strong>\${d.placements.map(p=>{
+      const correct=zoneById[p.zone]?.answer||'', ok=correct===p.word;
+      return \`<div class="answer-row"><div><span class="small muted">Riktig svar:</span><br>\${escapeHtml(correct)}</div><div><span class="small muted">Elevens svar:</span><br>\${escapeHtml(p.word)}</div><div><span class="\${ok?'pill ok':'pill warn'}">\${ok?'Riktig':'Feil'}</span></div></div>\`;
+    }).join('')}</div>\`;
+  }
+  return '';
+}
+
+window.viewResponse=(idx)=>{
+  const r=store.responses[idx];
+  if(!r) return;
+  const task=store.tasks[r.code];
+  $('responseDetail').innerHTML=\`
+    <div class="card">
+      <div class="response-detail-head"><div><h3 style="margin-bottom:4px">\${escapeHtml(r.name)} – \${escapeHtml(r.title)}</h3><div class="small muted">Levert \${new Date(r.submitted).toLocaleString('no-NO')} · Kode \${escapeHtml(r.code)}</div></div><button type="button" class="secondary" onclick="closeResponseDetail()">Lukk</button></div>
+      \${r.details.map((d,i)=>{
+        const question=task?.questions?.[i];
+        return \`<div class="q"><h4>\${i+1}. \${escapeHtml(d.prompt)}</h4>\${d.type==='mc'
+          ? \`<div class="answer-box"><p><strong>Elevens svar:</strong> \${escapeHtml(d.answer)}</p><p><strong>Riktig svar:</strong> \${escapeHtml(d.correctAnswer)}</p><p><span class="\${d.correct?'pill ok':'pill warn'}">\${d.correct?'Riktig':'Feil'}</span></p></div>\`
+          : (d.type==='drag'||d.type==='imageDrop')
+            ? dragDetailHtml(d,question)
+            : \`<div class="answer-box"><p><strong>Elevens svar:</strong></p><p style="white-space:pre-wrap">\${escapeHtml(d.answer)}</p></div>\${question?.modelAnswer?\`<div class="answer-box"><strong>Fasit / lærergrunnlag:</strong><p>\${escapeHtml(question.modelAnswer)}</p></div>\`:''}<label>Tilbakemelding fra lærer</label><textarea id="fb_\${idx}_\${i}" placeholder="Skriv tilbakemelding...">\${escapeHtml(d.teacherFeedback||'')}</textarea><button class="secondary" onclick="saveFeedback(\${idx},\${i})">Lagre tilbakemelding</button>\`}</div>\`;
+      }).join('')}
+    </div>\`;
+  $('responseDetail').scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+window.closeResponseDetail=()=>{const el=$('responseDetail');if(el)el.innerHTML=''};
+window.deleteResponse=(idx)=>{
+  const rs=store.responses, r=rs[idx];
+  if(!r) return;
+  if(!confirm(\`Vil du slette besvarelsen fra \${r.name} på "\${r.title}"? Dette kan ikke angres.\`)) return;
+  rs.splice(idx,1);store.responses=rs;renderResponses();
+};
+window.saveFeedback=(ri,di)=>{
+  const rs=store.responses;
+  if(!rs[ri]||!rs[ri].details?.[di]) return;
+  rs[ri].details[di].teacherFeedback=$(\`fb_\${ri}_\${di}\`).value;
+  rs[ri].details[di].status='Vurdert';
+  store.responses=rs;alert('Tilbakemeldingen er lagret.');
+};
+`;
+
+    html=html.replace(/function renderResponses\(\)\{[\s\S]*?(?=document\.addEventListener\('DOMContentLoaded')/,responsePatch);
 
     document.open();
     document.write(html);
