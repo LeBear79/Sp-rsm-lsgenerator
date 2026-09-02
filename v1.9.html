@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spørsmålsgenerator v1.9</title>
+</head>
+<body>
+  <p style="font-family:system-ui;padding:20px">Laster Spørsmålsgenerator v1.9 …</p>
+  <script>
+    fetch('index.html')
+      .then(r => {
+        if(!r.ok) throw new Error('Kunne ikke laste grunnversjonen.');
+        return r.text();
+      })
+      .then(html => {
+        html = html
+          .replace('<title>Spørsmålsgenerator v1.8</title>', '<title>Spørsmålsgenerator v1.9</title>')
+          .replace('<div class="version">v1.8</div>', '<div class="version">v1.9</div>')
+          .replace('</body>', '<script src="v1.9-patch.js"><\\/script></body>');
+        document.open();
+        document.write(html);
+        document.close();
+      })
+      .catch(err => {
+        document.body.innerHTML = '<p style="font-family:system-ui;padding:20px">Kunne ikke laste v1.9: ' + err.message + '</p>';
+      });
+  </script>
+</body>
+</html>
