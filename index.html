@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KunnskapsLab v2.0.2</title></head><body><script>
+<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KunnskapsLab v2.0.3</title></head><body><script>
 (async()=>{try{
   const response=await fetch('https://raw.githubusercontent.com/LeBear79/Sp-rsm-lsgenerator/8246d770325ff19e149e6d30e642a1e11b440506/index.html',{cache:'no-store'});
   if(!response.ok) throw new Error('Kunne ikke laste stabil grunnversjon.');
   let html=await response.text();
-  html=html.replaceAll('v1.9.8','v2.0.2');
+  html=html.replaceAll('v1.9.8','v2.0.3');
   const oldWrite='document.open();document.write(html);document.close();';
-  const newWrite=`html=html.replace('</body>','<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></'+'script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></'+'script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></'+'script><script src="./fix-v1-9-11.js"></'+'script><script src="./fix-v1-9-12.js"></'+'script><script src="./firebase-v2.js?v=2.0.2-20260906"></'+'script></body>');document.open();document.write(html);document.close();`;
+  const newWrite=`html=html.replace('</body>','<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></'+'script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></'+'script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></'+'script><script src="./fix-v1-9-11.js"></'+'script><script src="./fix-v1-9-12.js"></'+'script><script src="./firebase-v2.js?v=2.0.3-20260906"></'+'script></body>');document.open();document.write(html);document.close();`;
   if(!html.includes(oldWrite)) throw new Error('Fant ikke innlastingspunktet i grunnversjonen.');
   html=html.replace(oldWrite,newWrite);
   document.open();document.write(html);document.close();
