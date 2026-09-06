@@ -1,15 +1,14 @@
 <!doctype html>
-<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spørsmålsgenerator v1.9.10</title></head><body><script>
+<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spørsmålsgenerator v1.9.11</title></head><body><script>
 (async()=>{try{
   const response=await fetch('https://raw.githubusercontent.com/LeBear79/Sp-rsm-lsgenerator/8246d770325ff19e149e6d30e642a1e11b440506/index.html',{cache:'no-store'});
   if(!response.ok) throw new Error('Kunne ikke laste stabil grunnversjon.');
   let html=await response.text();
-  html=html.replaceAll('v1.9.8','v1.9.10');
+  html=html.replaceAll('v1.9.8','v1.9.11');
 
-  // Legg inn en egen rettelse etter at hele appen er lastet.
-  // Da endrer vi ikke lærerinnloggingen eller resten av hovedkoden.
+  // Legg inn rettelser og nye funksjoner etter at hele appen er lastet.
   const oldWrite='document.open();document.write(html);document.close();';
-  const newWrite=`html=html.replace('</body>','<script src="./fix-v1-9-10.js"></'+'script></body>');document.open();document.write(html);document.close();`;
+  const newWrite=`html=html.replace('</body>','<script src="./fix-v1-9-11.js"></'+'script></body>');document.open();document.write(html);document.close();`;
   if(!html.includes(oldWrite)) throw new Error('Fant ikke innlastingspunktet i grunnversjonen.');
   html=html.replace(oldWrite,newWrite);
 
