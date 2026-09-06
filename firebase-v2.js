@@ -1,7 +1,7 @@
 (() => {
-  const VERSION='v2.0.2';
+  const VERSION='v2.0.3';
   const cfg={
-    apiKey:'AIzaSyAxDNqFPx8quVK-DPM24sYM-IOE9KmXH_I',
+    apiKey:'AIzaSyAxDNqFPx8quVK-DPM24sYM-IOF9KmXH_I',
     authDomain:'kunnskapslab.firebaseapp.com',
     projectId:'kunnskapslab',
     storageBucket:'kunnskapslab.firebasestorage.app',
