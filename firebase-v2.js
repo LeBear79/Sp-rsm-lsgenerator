@@ -1,5 +1,5 @@
 (() => {
-  const VERSION='v2.0.3';
+  const VERSION='v2.0.4';
   const cfg={
     apiKey:'AIzaSyAxDNqFPx8quVK-DPM24sYM-IOF9KmXH_I',
     authDomain:'kunnskapslab.firebaseapp.com',
@@ -23,16 +23,105 @@
   document.body.appendChild(overlay);
   const nav=document.querySelector('header nav');
   if(nav){const info=document.createElement('div');info.id='klUser';nav.appendChild(info);const out=document.createElement('button');out.id='klLogout';out.className='kl-logout';out.textContent='Logg ut';out.style.display='none';nav.appendChild(out);}
+
   function parse(key,fallback){try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback));}catch{return fallback;}}
   function roleDoc(uid){return db.collection('users').doc(uid);}
-  async function putTasks(tasks){if(role!=='teacher'||remoteApplying)return;const batch=db.batch();Object.entries(tasks||{}).forEach(([id,t])=>batch.set(db.collection('tasks').doc(id),{...t,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()}));await batch.commit();}
-  async function putResponses(arr){if(remoteApplying)return;const batch=db.batch();(arr||[]).forEach(r=>{if(!r?.id)return;const data={...r,studentId:r.studentId||user?.uid||''};batch.set(db.collection('responses').doc(r.id),data,{merge:true});});await batch.commit();}
-  async function pullTasks(){const snap=await db.collection('tasks').get();const cloud={};snap.forEach(d=>{const x=d.data();delete x._updatedAt;cloud[d.id]=x;});const local=parse('sg_tasks',{});const merged=role==='teacher'?{...cloud,...local}:cloud;remoteApplying=true;localStorage.setItem('sg_tasks',JSON.stringify(merged));remoteApplying=false;if(role==='teacher'&&Object.keys(local).length)await putTasks(merged);}
-  async function pullResponses(){if(role!=='teacher')return;const snap=await db.collection('responses').get();const cloud=[];snap.forEach(d=>cloud.push(d.data()));const local=parse('sg_responses',[]);const map=new Map(cloud.map(r=>[r.id,r]));local.forEach(r=>map.set(r.id,r));const merged=[...map.values()];remoteApplying=true;localStorage.setItem('sg_responses',JSON.stringify(merged));remoteApplying=false;if(local.length)await putResponses(merged);}
+
+  async function syncTasks(tasks){
+    if(role!=='teacher'||remoteApplying) return;
+    const local=tasks||{};
+    const snap=await db.collection('tasks').get();
+    const remoteIds=new Set(); snap.forEach(d=>remoteIds.add(d.id));
+    const batch=db.batch();
+    Object.entries(local).forEach(([id,t])=>{
+      batch.set(db.collection('tasks').doc(id),{...t,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      remoteIds.delete(id);
+    });
+    remoteIds.forEach(id=>batch.delete(db.collection('tasks').doc(id)));
+    await batch.commit();
+  }
+
+  async function uploadStudentResponses(arr){
+    if(role!=='student'||remoteApplying) return;
+    const mine=(arr||[]).filter(r=>r?.id && (!r.studentId || r.studentId===user?.uid));
+    const batch=db.batch();
+    mine.forEach(r=>batch.set(db.collection('responses').doc(r.id),{...r,studentId:user.uid},{merge:true}));
+    await batch.commit();
+  }
+
+  async function syncResponses(arr){
+    if(role!=='teacher'||remoteApplying) return;
+    const local=(arr||[]).filter(r=>r?.id);
+    const snap=await db.collection('responses').get();
+    const remoteIds=new Set(); snap.forEach(d=>remoteIds.add(d.id));
+    const batch=db.batch();
+    local.forEach(r=>{
+      batch.set(db.collection('responses').doc(r.id),r,{merge:true});
+      remoteIds.delete(r.id);
+    });
+    remoteIds.forEach(id=>batch.delete(db.collection('responses').doc(id)));
+    await batch.commit();
+  }
+
+  async function pullTasks(){
+    const snap=await db.collection('tasks').get();
+    const cloud={}; snap.forEach(d=>{const x=d.data();delete x._updatedAt;cloud[d.id]=x;});
+    const local=parse('sg_tasks',{});
+    if(role==='teacher' && snap.empty && Object.keys(local).length){
+      await syncTasks(local);
+      return;
+    }
+    remoteApplying=true; localStorage.setItem('sg_tasks',JSON.stringify(cloud)); remoteApplying=false;
+  }
+
+  async function pullResponses(){
+    if(role!=='teacher') return;
+    const snap=await db.collection('responses').get();
+    const cloud=[]; snap.forEach(d=>cloud.push(d.data()));
+    const local=parse('sg_responses',[]);
+    if(snap.empty && local.length){
+      await syncResponses(local);
+      return;
+    }
+    remoteApplying=true; localStorage.setItem('sg_responses',JSON.stringify(cloud)); remoteApplying=false;
+  }
+
   const nativeSet=Storage.prototype.setItem;
-  Storage.prototype.setItem=function(k,val){nativeSet.call(this,k,val);if(this!==localStorage||!ready||remoteApplying)return;if(k==='sg_tasks'&&role==='teacher')putTasks(parse('sg_tasks',{})).catch(console.error);if(k==='sg_responses')putResponses(parse('sg_responses',[])).catch(console.error);};
-  async function afterLogin(u){user=u;const ds=await roleDoc(u.uid).get();role=ds.exists?ds.data().role:null;if(!['teacher','student'].includes(role)){await auth.signOut();throw new Error('Denne brukeren mangler tilgangsrolle.');}await pullTasks();await pullResponses();ready=true;overlay.classList.add('hidden');const info=$('klUser');if(info)info.textContent=(role==='teacher'?'Lærer: ':'Elev: ')+u.email;const out=$('klLogout');if(out)out.style.display='inline-block';if(role==='student'){document.body.classList.remove('teacher-auth');['navTeacher','navArchive','navResponses','teacherLogoutBtn'].forEach(id=>{const e=$(id);if(e)e.style.display='none';});const ns=$('navStudent');if(ns)ns.click();}else{const oldLogout=$('teacherLogoutBtn');if(oldLogout)oldLogout.style.display='none';}}
+  Storage.prototype.setItem=function(k,val){
+    nativeSet.call(this,k,val);
+    if(this!==localStorage||!ready||remoteApplying) return;
+    if(k==='sg_tasks'&&role==='teacher') syncTasks(parse('sg_tasks',{})).catch(console.error);
+    if(k==='sg_responses'){
+      if(role==='teacher') syncResponses(parse('sg_responses',[])).catch(console.error);
+      else if(role==='student') uploadStudentResponses(parse('sg_responses',[])).catch(console.error);
+    }
+  };
+
+  async function afterLogin(u){
+    user=u; const ds=await roleDoc(u.uid).get(); role=ds.exists?ds.data().role:null;
+    if(!['teacher','student'].includes(role)){await auth.signOut();throw new Error('Denne brukeren mangler tilgangsrolle.');}
+    await pullTasks(); await pullResponses(); ready=true; overlay.classList.add('hidden');
+    const info=$('klUser'); if(info)info.textContent=(role==='teacher'?'Lærer: ':'Elev: ')+u.email;
+    const out=$('klLogout'); if(out)out.style.display='inline-block';
+    if(role==='student'){
+      document.body.classList.remove('teacher-auth');
+      ['navTeacher','navArchive','navResponses','teacherLogoutBtn'].forEach(id=>{const e=$(id);if(e)e.style.display='none';});
+      const ns=$('navStudent'); if(ns)ns.click();
+    }else{
+      const oldLogout=$('teacherLogoutBtn'); if(oldLogout)oldLogout.style.display='none';
+    }
+  }
+
   function friendlyAuthError(err){const code=err?.code||'ukjent-feil';const map={'auth/invalid-credential':'Firebase avviser e-post eller passord.','auth/invalid-login-credentials':'Firebase avviser e-post eller passord.','auth/user-not-found':'Firebase finner ikke denne brukeren.','auth/wrong-password':'Passordet stemmer ikke.','auth/unauthorized-domain':'Domenet er ikke godkjent i Firebase.','auth/operation-not-allowed':'E-post/passord er ikke aktivert som innloggingsmetode.','auth/network-request-failed':'Nettleseren fikk ikke kontakt med Firebase.','auth/invalid-api-key':'Firebase API-nøkkelen i appen er ugyldig.'};return (map[code]||err?.message||'Kunne ikke logge inn.')+' Feilkode: '+code;}
-  function init(){if(!window.firebase){$('klErr').textContent='Kunne ikke laste Firebase. Oppdater siden.';return;}try{if(!firebase.apps.length)firebase.initializeApp(cfg);auth=firebase.auth();db=firebase.firestore();}catch(err){console.error(err);$('klErr').textContent='Firebase kunne ikke startes. '+(err.code||err.message||'');return;}$('klLogin').onclick=async()=>{const e=$('klEmail').value.trim(),p=$('klPass').value;$('klErr').textContent='Logger inn …';try{await auth.signInWithEmailAndPassword(e,p);}catch(err){console.error(err);$('klErr').textContent=friendlyAuthError(err);}};$('klPass').addEventListener('keydown',e=>{if(e.key==='Enter')$('klLogin').click();});$('klLogout').onclick=()=>auth.signOut();auth.onAuthStateChanged(async u=>{ready=false;if(!u){user=null;role=null;overlay.classList.remove('hidden');const out=$('klLogout');if(out)out.style.display='none';return;}try{await afterLogin(u);}catch(err){console.error(err);$('klErr').textContent=(err.message||'Kunne ikke åpne KunnskapsLab.')+(err.code?' Feilkode: '+err.code:'');overlay.classList.remove('hidden');}});}
+
+  function init(){
+    if(!window.firebase){$('klErr').textContent='Kunne ikke laste Firebase. Oppdater siden.';return;}
+    try{if(!firebase.apps.length)firebase.initializeApp(cfg);auth=firebase.auth();db=firebase.firestore();}
+    catch(err){console.error(err);$('klErr').textContent='Firebase kunne ikke startes. '+(err.code||err.message||'');return;}
+    $('klLogin').onclick=async()=>{const e=$('klEmail').value.trim(),p=$('klPass').value;$('klErr').textContent='Logger inn …';try{await auth.signInWithEmailAndPassword(e,p);}catch(err){console.error(err);$('klErr').textContent=friendlyAuthError(err);}};
+    $('klPass').addEventListener('keydown',e=>{if(e.key==='Enter')$('klLogin').click();});
+    $('klLogout').onclick=()=>auth.signOut();
+    auth.onAuthStateChanged(async u=>{ready=false;if(!u){user=null;role=null;overlay.classList.remove('hidden');const out=$('klLogout');if(out)out.style.display='none';return;}try{await afterLogin(u);}catch(err){console.error(err);$('klErr').textContent=(err.message||'Kunne ikke åpne KunnskapsLab.')+(err.code?' Feilkode: '+err.code:'');overlay.classList.remove('hidden');}});
+  }
   init();
 })();
